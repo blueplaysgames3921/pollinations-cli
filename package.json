@@ -1,7 +1,9 @@
 {
-  "name": "pollinations-cli",
-  "version": "1.1.0",
+  "name": "@blueplaysgames3921/pollinations-cli",
+  "version": "1.0.0",
   "type": "module",
+  "author": "blueplaysgames3921",
+  "license": "MIT",
   "bin": {
     "pollinations": "./bin/pollinations.js"
   },
