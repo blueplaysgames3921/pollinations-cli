@@ -8,47 +8,27 @@ import chalk from 'chalk';
 
 program
   .name('pollinations')
-  .description('Pro-grade CLI for Pollinations.ai')
   .version('1.0.0');
 
-// AUTH
 program.command('login <key>')
-  .description('Store your API key')
   .action((key) => {
     config.set('apiKey', key);
-    console.log(chalk.green('✔ API Key saved to ~/.pollinations/config.json'));
+    console.log(chalk.green('✔ API Key stored.'));
   });
 
-// TEXT
 program.command('text [prompt]')
-  .description('Generate text or code')
-  .option('-f, --file <path>', 'Read prompt from file')
   .option('-m, --model <model>', 'Model name', 'openai')
-  .option('-s, --stream', 'Stream output live')
+  .option('-s, --stream', 'Stream output')
   .action(textAction);
 
-// IMAGE
 program.command('image <prompt>')
-  .description('Generate AI art')
-  .option('-o, --output <path>', 'Output file path')
-  .option('-w, --width <number>', 'Image width', '1024')
-  .option('-h, --height <number>', 'Image height', '1024')
-  .option('-m, --model <model>', 'Model (flux, turbo, etc)', 'flux')
+  .option('-o, --output <path>', 'Output file')
+  .option('-w, --width <width>', 'Width', '1024')
+  .option('-h, --height <height>', 'Height', '1024')
+  .option('-m, --model <model>', 'Model', 'flux')
   .action(imageAction);
 
-// MODELS
 program.command('models')
-  .description('List available models')
-  .option('-t, --type <type>', 'Filter by type (text/image)')
   .action(listModels);
 
-// CONFIG
-program.command('config')
-  .description('Show current settings')
-  .action(() => {
-    console.log(chalk.yellow('Current Config:'));
-    console.log(config.store);
-  });
-
 program.parse();
-
