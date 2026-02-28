@@ -19,8 +19,9 @@ npm link --force
 ```
 ## Configuration
 Set your API key to enable high-rate limits and account features. Keys are stored locally in ~/.pollinations/config.json.
+```bash
 pollinations login <your_api_key>
-
+```
 **Verify your current settings and storage path:**
 ```bash
 pollinations config
@@ -49,8 +50,14 @@ pollinations batch prompts.txt --parallel 5 --output-dir ./outputs
 ```
 ## History and Replay
 The CLI maintains an append-only log of the last 50 operations in ~/.pollinations/history.jsonl.
- * View History: pollinations history
- * Rerun Command: pollinations replay <id>
+ * View History:
+```bash
+pollinations history
+```
+ * Rerun Command:
+```bash
+pollinations replay <id>
+```
 ### Templates
 Save reusable prompt structures with variable placeholders.
  * Save: pollinations template save review "Analyze this {language} code for security: {code}"
