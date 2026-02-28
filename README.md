@@ -12,7 +12,7 @@ npm install -g pollinations-cli
 ### Option 2: Local Development (Unpublished)
 To run the project from source (e.g., in Termux or a cloned repo):
 ```bash
-git clone [https://github.com/blueplaysgames3921/pollinations-cli.git](https://github.com/blueplaysgames3921/pollinations-cli.git)
+git clone https://github.com/blueplaysgames3921/pollinations-cli.git
 cd pollinations-cli
 npm install
 npm link --force
