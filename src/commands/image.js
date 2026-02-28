@@ -1,20 +1,25 @@
-import axios from 'axios';
+import { getApi } from '../lib/api.js';
+import { logHistory } from './history.js';
 import fs from 'fs-extra';
 import chalk from 'chalk';
+import ora from 'ora';
 
 export async function imageAction(prompt, options) {
-  const model = options.model || 'flux';
-  const url = `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?model=${model}&width=${options.width}&height=${options.height}&nologo=true&seed=${Math.floor(Math.random() * 1e6)}`;
-  const fileName = options.output || `pollin_${Date.now()}.png`;
+  const spinner = ora('Generating...').start();
+  const api = getApi();
+  const seed = Math.floor(Math.random() * 1e9);
+  
+  // Endpoint verified: gen.pollinations.ai/image/${prompt}
+  const url = `/image/${encodeURIComponent(prompt)}?model=${options.model}&width=${options.width}&height=${options.height}&seed=${seed}&nologo=true`;
 
   try {
-    console.log(chalk.yellow('Generating...'));
-    const response = await axios({ url, method: 'GET', responseType: 'stream' });
-    const writer = fs.createWriteStream(fileName);
-    response.data.pipe(writer);
-    writer.on('finish', () => console.log(chalk.green(`✔ Saved: ${fileName}`)));
+    await logHistory('image', { prompt, options });
+    const res = await api.get(url, { responseType: 'stream' });
+    const out = options.output || `img_${Date.now()}.png`;
+    const writer = fs.createWriteStream(out);
+    res.data.pipe(writer);
+    writer.on('finish', () => spinner.succeed(chalk.green(`Saved: ${out}`)));
   } catch (err) {
-    console.error(chalk.red('Error:'), err.message);
+    spinner.fail(chalk.red(`Failed: ${err.message}`));
   }
 }
-
