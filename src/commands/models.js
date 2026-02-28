@@ -1,12 +1,24 @@
-import axios from 'axios';
+import { getApi } from '../lib/api.js';
+import Table from 'cli-table3';
 import chalk from 'chalk';
 
-export async function listModels() {
+export async function listModels(options) {
+  const api = getApi();
   try {
-    const { data } = await axios.get('https://gen.pollinations.ai/v1/models');
-    console.log(chalk.bold.green('\nAvailable Models:'));
-    data.data.forEach(m => console.log(`- ${m.id}`));
+    const { data } = await api.get('/v1/models');
+    const table = new Table({ head: [chalk.green('ID'), chalk.green('Type'), chalk.green('Access')] });
+
+    data.data.forEach(m => {
+      let type = 'text/image';
+      if (m.id.toLowerCase().includes('video')) type = 'video';
+      if (m.id.toLowerCase().includes('audio') || m.id.toLowerCase().includes('voice')) type = 'audio';
+      
+      if (options.type && !type.includes(options.type)) return;
+      table.push([m.id, type, 'Standard']);
+    });
+
+    console.log(table.toString());
   } catch (err) {
-    console.log(chalk.red('Could not fetch models.'));
+    console.error(chalk.red('Could not fetch models from gen.pollinations.ai'));
   }
 }
