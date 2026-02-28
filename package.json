@@ -1,0 +1,18 @@
+{
+  "name": "pollinations-cli",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "pollinations": "./bin/pollinations.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "chalk": "^5.3.0",
+    "commander": "^11.1.0",
+    "conf": "^12.0.0",
+    "fs-extra": "^11.1.1",
+    "ora": "^7.0.1",
+    "cli-table3": "^0.6.3"
+  }
+}
+
