@@ -4,6 +4,7 @@ import { textAction } from '../src/commands/text.js';
 import { imageAction } from '../src/commands/image.js';
 import { listModels } from '../src/commands/models.js';
 import { batchAction } from '../src/commands/batch.js';
+import { profileAction } from '../src/commands/profile.js';
 import { historyAction, replayAction } from '../src/commands/history.js';
 import { templateSave, templateRun } from '../src/commands/template.js';
 import { config } from '../src/lib/config-store.js';
@@ -41,6 +42,10 @@ program.command('batch <file>')
 
 program.command('history').action(historyAction);
 program.command('replay <id>').action(replayAction);
+
+program.command('profile')
+  .description('View your Pollen balance and account details')
+  .action(profileAction);
 
 const template = program.command('template');
 template.command('save <name> <content>').action(templateSave);
