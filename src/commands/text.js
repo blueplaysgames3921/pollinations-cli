@@ -1,44 +1,37 @@
 import axios from 'axios';
 import chalk from 'chalk';
-import fs from 'fs-extra';
-import { config } from '../lib/config-store.js';
 
 export async function textAction(prompt, options) {
-  let finalPrompt = prompt;
-
-  // 1. Check for Piping (cat file | pollinations text)
-  if (!process.stdin.isTTY) {
-    const stdinData = await new Promise(resolve => {
-      let data = '';
-      process.stdin.on('data', chunk => data += chunk);
-      process.stdin.on('end', () => resolve(data));
-    });
-    finalPrompt = `${stdinData}\n${prompt || ''}`;
-  } 
-  // 2. Check for File input
-  else if (options.file) {
-    finalPrompt = await fs.readFile(options.file, 'utf8');
-  }
-
-  if (!finalPrompt) return console.error(chalk.red('Error: No prompt provided.'));
+  const url = 'https://gen.pollinations.ai/v1/chat/completions';
+  const payload = {
+    messages: [{ role: 'user', content: prompt }],
+    model: options.model || 'openai',
+    stream: options.stream || false
+  };
 
   try {
-    const response = await axios.post('https://text.pollinations.ai/openai/chat/completions', {
-      model: options.model,
-      messages: [{ role: 'user', content: finalPrompt }],
-      stream: options.stream || false
-    }, {
-      headers: { Authorization: `Bearer ${config.get('apiKey')}` },
+    const res = await axios.post(url, payload, {
       responseType: options.stream ? 'stream' : 'json'
     });
 
     if (options.stream) {
-      response.data.on('data', chunk => process.stdout.write(chunk.toString()));
+      res.data.on('data', chunk => {
+        const lines = chunk.toString().split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') return;
+            try {
+              const parsed = JSON.parse(data);
+              process.stdout.write(parsed.choices[0].delta?.content || '');
+            } catch (e) {}
+          }
+        }
+      });
     } else {
-      console.log(chalk.cyan(response.data.choices[0].message.content));
+      console.log(chalk.cyan(res.data.choices[0].message.content));
     }
   } catch (err) {
-    console.error(chalk.red('API Error:'), err.message);
+    console.error(chalk.red('Error:'), err.message);
   }
 }
-
