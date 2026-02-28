@@ -8,14 +8,15 @@ A high-performance command line interface for Pollinations.ai. This tool provide
 If the package is published to npm, install it globally:
 ```bash
 npm install -g pollinations-cli
-
+```
 ### Option 2: Local Development (Unpublished)
 To run the project from source (e.g., in Termux or a cloned repo):
+```bash
 git clone [https://github.com/blueplaysgames3921/pollinations-cli.git](https://github.com/blueplaysgames3921/pollinations-cli.git)
 cd pollinations-cli
 npm install
 npm link --force
-
+```
 ## Configuration
 Set your API key to enable high-rate limits and account features. Keys are stored locally in ~/.pollinations/config.json.
 pollinations login <your_api_key>
@@ -23,7 +24,7 @@ pollinations login <your_api_key>
 **Verify your current settings and storage path:**
 ```bash
 pollinations config
-
+```
 ## Core Commands
 ### Text Generation
 Uses the OpenAI-compatible /v1/chat/completions endpoint.
@@ -45,7 +46,7 @@ Uses the /image/{prompt} endpoint with direct buffer streaming.
 Run multiple image prompts from a newline-delimited text file.
 ```bash
 pollinations batch prompts.txt --parallel 5 --output-dir ./outputs
-
+```
 ## History and Replay
 The CLI maintains an append-only log of the last 50 operations in ~/.pollinations/history.jsonl.
  * View History: pollinations history
