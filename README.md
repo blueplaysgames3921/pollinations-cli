@@ -29,42 +29,34 @@ pollinations config
 ## Core Commands
 ### Text Generation
 Uses the OpenAI-compatible /v1/chat/completions endpoint.
- * Standard: pollinations text "Explain quantum entanglement"
- * Stream: pollinations text "Write a technical brief" --stream
- * Model Selection: pollinations text "Code a landing page" --model qwen-coder
- * File Input: pollinations text -f context.txt
- * Piping: cat logs.txt | pollinations text "Summarize these errors"
+ * Standard: `pollinations text "Explain quantum entanglement"`
+ * Stream: `pollinations text "Write a technical brief" --stream`
+ * Model Selection: `pollinations text "Code a landing page" --model qwen-coder`
+ * File Input: `pollinations text -f context.txt`
+ * Piping: `cat logs.txt | pollinations text "Summarize these errors"`
 ### Image Generation
 Uses the /image/{prompt} endpoint with direct buffer streaming.
- * Basic: pollinations image "High-contrast architectural photography"
- * Advanced: pollinations image "Logo design" --model flux --width 1024 --height 1024 --output result.png
+ * Basic: `pollinations image "High-contrast architectural photography"`
+ * Advanced: `pollinations image "Logo design" --model flux --width 1024 --height 1024 --output result.png`
 ### Audio & Video
 * Speech: `pollinations audio "Hello, how are you today?" --output hello.mp3`
 * Video: `pollinations video "A futuristic space station orbiting Saturn"`
 ### Account and Models
- * Profile: pollinations profile (Displays Pollen balance, Tier, and Key permissions)
- * Model List: pollinations models
- * Filtered List: pollinations models --type image
+ * Profile: 1pollinations profile` (Displays Pollen balance, Tier, and Key permissions)
+ * Model List: `pollinations models`
+ * Filtered List: `pollinations models --type image`
 ## Power Features
 ### Batch Processing
 Run multiple image prompts from a newline-delimited text file.
-```bash
-pollinations batch prompts.txt --parallel 5 --output-dir ./outputs
-```
+`pollinations batch prompts.txt --parallel 5 --output-dir ./outputs`
 ## History and Replay
 The CLI maintains an append-only log of the last 50 operations in ~/.pollinations/history.jsonl.
- * View History:
-```bash
-pollinations history
-```
- * Rerun Command:
-```bash
-pollinations replay <id>
-```
+ * View History:`pollinations history`
+ * Rerun Command: `pollinations replay <id>`
 ### Templates
 Save reusable prompt structures with variable placeholders.
- * Save: pollinations template save review "Analyze this {language} code for security: {code}"
- * Run: pollinations template run review --language javascript
+ * Save: `pollinations template save review "Analyze this {language} code for security: {code}"`
+ * Run: `pollinations template run review --language javascript`
 ### Project Structure
  * bin/: Entry point and command routing.
  * src/commands/: Individual logic for API interactions.
