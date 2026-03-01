@@ -7,6 +7,8 @@ import { batchAction } from '../src/commands/batch.js';
 import { profileAction } from '../src/commands/profile.js';
 import { videoAction } from '../src/commands/video.js';
 import { audioAction } from '../src/commands/audio.js';
+import { galleryAction } from '../src/utils/history.js';
+import { chatAction } from '../src/commands/chat.js';
 import { historyAction, replayAction } from '../src/commands/history.js';
 import { templateSave, templateRun } from '../src/commands/template.js';
 import { config } from '../src/lib/config-store.js';
@@ -59,10 +61,22 @@ program.command('models')
   .option('-t, --type <type>', 'Filter (text/image/video/audio)')
   .action(listModels);
 
-program.command('batch <file>')
-  .option('-p, --parallel <number>', 'Parallel tasks', '5')
-  .option('-d, --output-dir <dir>', 'Output directory', './results')
+program
+  .command('batch <file>')
+  .description('Generate multiple images from a file')
+  .option('-o, --outputDir <dir>', 'Output directory', './outputs')
+  .option('-p, --parallel <number>', 'Parallel requests', '3')
   .action(batchAction);
+program
+  .command('chat')
+  .description('Start an interactive chat session')
+  .option('-m, --model <model>', 'Model to use', 'openai')
+  .option('-s, --system <prompt>', 'System message', 'You are a helpful assistant.')
+  .action(chatAction);
+program
+  .command('gallery')
+  .description('View batch generation history')
+  .action(galleryAction);
 
 program.command('history').action(historyAction);
 program.command('replay <id>').action(replayAction);
