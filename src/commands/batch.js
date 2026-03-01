@@ -26,5 +26,5 @@ export async function batchAction(file, options) {
   }));
 
   await Promise.all(tasks);
-  console.log(chalk.bold.green('✔ Batch processing complete. Check "pollinations gallery"'));
+  console.log(chalk.bold.green('✔ Batch complete. Check "pollinations gallery"'));
 }
