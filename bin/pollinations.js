@@ -5,6 +5,8 @@ import { imageAction } from '../src/commands/image.js';
 import { listModels } from '../src/commands/models.js';
 import { batchAction } from '../src/commands/batch.js';
 import { profileAction } from '../src/commands/profile.js';
+import { videoAction } from '../src/commands/video.js';
+import { audioAction } from '../src/commands/audio.js';
 import { historyAction, replayAction } from '../src/commands/history.js';
 import { templateSave, templateRun } from '../src/commands/template.js';
 import { config } from '../src/lib/config-store.js';
@@ -30,6 +32,16 @@ program.command('image <prompt>')
   .option('-w, --width <number>', 'Width', '1024')
   .option('-h, --height <number>', 'Height', '1024')
   .action(imageAction);
+
+program.command('audio <prompt>')
+  .option('-o, --output <path>', 'Output file', 'speech.mp3')
+  .option('-m, --model <model>', 'Voice model', 'openai')
+  .action(audioAction);
+
+program.command('video <prompt>')
+  .option('-o, --output <path>', 'Output file', 'video.mp4')
+  .action(videoAction);
+
 
 program.command('models')
   .option('-t, --type <type>', 'Filter (text/image/video/audio)')
