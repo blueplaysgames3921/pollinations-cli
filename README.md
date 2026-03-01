@@ -38,6 +38,9 @@ Uses the OpenAI-compatible /v1/chat/completions endpoint.
 Uses the /image/{prompt} endpoint with direct buffer streaming.
  * Basic: pollinations image "High-contrast architectural photography"
  * Advanced: pollinations image "Logo design" --model flux --width 1024 --height 1024 --output result.png
+### Audio & Video
+* Speech: `pollinations audio "Hello, how are you today?" --output hello.mp3`
+* Video: `pollinations video "A futuristic space station orbiting Saturn"`
 ### Account and Models
  * Profile: pollinations profile (Displays Pollen balance, Tier, and Key permissions)
  * Model List: pollinations models
