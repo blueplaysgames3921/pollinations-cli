@@ -1,7 +1,7 @@
 import fs from 'fs-extra';
 import pLimit from 'p-limit';
 import { imageAction } from './image.js';
-import { saveToGallery } from '../utils/history.js'; // Adjust path to where you put saveToGallery
+import { saveToGallery } from './history.js'; // Adjust path to where you put saveToGallery
 import chalk from 'chalk';
 import path from 'path';
 
