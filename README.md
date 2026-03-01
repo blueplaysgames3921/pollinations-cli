@@ -49,7 +49,7 @@ Uses the /image/{prompt} endpoint with direct buffer streaming.
 ### Batch Processing
 Run multiple image prompts from a newline-delimited text file.
 `pollinations batch prompts.txt --parallel 5 --output-dir ./outputs`
-## History and Replay
+### History and Replay
 The CLI maintains an append-only log of the last 50 operations in ~/.pollinations/history.jsonl.
  * View History:`pollinations history`
  * Rerun Command: `pollinations replay <id>`
