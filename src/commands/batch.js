@@ -1,7 +1,7 @@
 import fs from 'fs-extra';
 import pLimit from 'p-limit';
 import { imageAction } from './image.js';
-import { saveToGallery } from './history.js'; // Adjust path to where you put saveToGallery
+import { saveToGallery } from '../utils/history.js';
 import chalk from 'chalk';
 import path from 'path';
 
@@ -11,31 +11,20 @@ export async function batchAction(file, options) {
   const limit = pLimit(parseInt(options.parallel || 3));
   
   await fs.ensureDir(options.outputDir);
-
-  console.log(chalk.yellow(`🚀 Processing ${lines.length} prompts in batch...`));
+  console.log(chalk.yellow(`Processing ${lines.length} prompts...`));
   
   const tasks = lines.map((line, i) => limit(async () => {
     const fileName = `batch_${Date.now()}_${i}.png`;
     const outputPath = path.join(options.outputDir, fileName);
-    
     try {
-      // Run the image generation
-      await imageAction(line, { 
-        output: outputPath, 
-        model: 'flux', 
-        width: 1024, 
-        height: 1024 
-      });
-
-      // Log it to our gallery database
-      saveToGallery(line, fileName, 'batch');
-      
-      console.log(chalk.gray(`  ✔ Generated: ${fileName}`));
+      await imageAction(line, { output: outputPath, model: 'flux', width: 1024, height: 1024 });
+      await saveToGallery(line, fileName, 'batch');
+      console.log(chalk.green(`✔ Saved: ${fileName}`));
     } catch (err) {
-      console.log(chalk.red(`  ✘ Failed: ${line.substring(0, 20)}...`));
+      console.log(chalk.red(`✘ Error on "${line.substring(0,20)}": ${err.message}`));
     }
   }));
 
   await Promise.all(tasks);
-  console.log(chalk.bold.green('\n✔ All batch tasks finished. Type "pollinations gallery" to see the log!'));
+  console.log(chalk.bold.green('✔ Batch processing complete. Check "pollinations gallery"'));
 }
