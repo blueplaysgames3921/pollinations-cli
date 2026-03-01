@@ -34,12 +34,24 @@ program.command('image <prompt>')
   .action(imageAction);
 
 program.command('audio <prompt>')
-  .option('-o, --output <path>', 'Output file', 'speech.mp3')
-  .option('-m, --model <model>', 'Voice model', 'openai')
+  .description('Generate high-fidelity music/speech')
+  .option('-o, --output <path>', 'Output file path')
+  .option('-m, --model <model>', 'Audio model', 'elevenlabs')
+  .option('--voice <name>', 'Voice ID (e.g., rachel, alloy)', 'rachel')
+  .option('--speed <number>', 'Speed (0.25 to 4.0)', '1')
+  .option('--duration <number>', 'Seconds (max 30)', '30')
+  .option('--instrumental <bool>', 'Music only (true/false)', 'false')
   .action(audioAction);
 
 program.command('video <prompt>')
-  .option('-o, --output <path>', 'Output file', 'video.mp4')
+  .description('Generate video using GET /video/{prompt}')
+  .option('-o, --output <path>', 'Output file path')
+  .option('-m, --model <model>', 'Video model (veo, seedance)', 'seedance')
+  .option('-w, --width <number>', 'Width', '1024')
+  .option('-h, --height <number>', 'Height', '576')
+  .option('--duration <number>', 'Duration in seconds (4, 6, 8)', '4')
+  .option('--audio <bool>', 'Include audio cues', 'true')
+  .option('--seed <number>', 'Manual seed')
   .action(videoAction);
 
 
