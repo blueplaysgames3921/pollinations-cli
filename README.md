@@ -7,7 +7,7 @@ A high-performance command line interface for Pollinations.ai. This tool provide
 ### Option 1: Global (After NPM Publish)
 If the package is published to npm, install it globally:
 ```bash
-npm install -g pollinations-cli
+npm install -g @bluegaminggm/pollinations-cli
 ```
 ### Option 2: Local Development (Unpublished)
 To run the project from source (e.g., in Termux or a cloned repo):
