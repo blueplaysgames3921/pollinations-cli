@@ -42,7 +42,7 @@ Uses the /image/{prompt} endpoint with direct buffer streaming.
 * Speech: `pollinations audio "Hello, how are you today?" --output hello.mp3`
 * Video: `pollinations video "A futuristic space station orbiting Saturn"`
 ### Account and Models
- * Profile: 1pollinations profile` (Displays Pollen balance, Tier, and Key permissions)
+ * Profile: `pollinations profile` (Displays Pollen balance, Tier, and Key permissions)
  * Model List: `pollinations models`
  * Filtered List: `pollinations models --type image`
 ## Power Features
