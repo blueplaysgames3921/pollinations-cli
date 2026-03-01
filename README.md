@@ -1,7 +1,7 @@
 # Pollinations CLI
 
 A high-performance command line interface for Pollinations.ai. This tool provides a unified bridge to text, image, audio, and video models via the gen.pollinations.ai infrastructure.
-
+---
 ## Installation
 
 ### Option 1: Global (After NPM Publish)
@@ -17,6 +17,7 @@ cd pollinations-cli
 npm install
 npm link --force
 ```
+---
 ## Configuration
 Set your API key to enable high-rate limits and account features. Keys are stored locally in ~/.pollinations/config.json.
 ```bash
@@ -38,13 +39,17 @@ Uses the OpenAI-compatible /v1/chat/completions endpoint.
 Uses the /image/{prompt} endpoint with direct buffer streaming.
  * Basic: `pollinations image "High-contrast architectural photography"`
  * Advanced: `pollinations image "Logo design" --model flux --width 1024 --height 1024 --output result.png`
-### Audio & Video
-* Speech: `pollinations audio "Hello, how are you today?" --output hello.mp3`
-* Video: `pollinations video "A futuristic space station orbiting Saturn"`
+### Audio & Video Generation
+Standardized generation for multimedia models.
+* Speech/Music: `pollinations audio "A calm narration about space" --voice rachel --speed 1.0`
+* Video: `pollinations video "A futuristic spacecraft landing" --width 1280 --height 720`
+* Audio Options: `--voice`, `--speed`, `--duration`, `--instrumental`
+* Video Options:  `--width`, `--height`, `--duration`, `--audio`
 ### Account and Models
  * Profile: `pollinations profile` (Displays Pollen balance, Tier, and Key permissions)
  * Model List: `pollinations models`
  * Filtered List: `pollinations models --type image`
+---
 ## Power Features
 ### Batch Processing
 Run multiple image prompts from a newline-delimited text file.
