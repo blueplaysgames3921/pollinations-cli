@@ -1,5 +1,5 @@
 # Pollinations CLI
-
+---
 A high-performance command line interface for Pollinations.ai. This tool provides a unified bridge to text, image, audio, and video models via the gen.pollinations.ai infrastructure.
 ---
 ## Installation
