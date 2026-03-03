@@ -45,6 +45,12 @@ Standardized generation for multimedia models.
 * Video: `pollinations video "A futuristic spacecraft landing" --width 1280 --height 720`
 * Audio Options: `--voice`, `--speed`, `--duration`, `--instrumental`
 * Video Options:  `--width`, `--height`, `--duration`, `--audio`
+### Interactive Chat
+Start a continuous conversation with memory (context). The CLI will remember previous messages in the session.
+* **Start Chat:** `pollinations chat`
+* **Custom Model:** `pollinations chat --model openai`
+* **System Prompt:** `pollinations chat --system "You are a senior web developer"`
+* **Commands inside Chat:** Type `clear` to reset memory or `exit` to leave.
 ### Account and Models
  * Profile: `pollinations profile` (Displays Pollen balance, Tier, and Key permissions)
  * Model List: `pollinations models`
@@ -54,6 +60,10 @@ Standardized generation for multimedia models.
 ### Batch Processing
 Run multiple image prompts from a newline-delimited text file.
 `pollinations batch prompts.txt --parallel 5 --output-dir ./outputs`
+### Gallery (Batch History)
+Keep track of your batch image generations. Every time you run a `batch` command, the prompt and filename are logged.
+* **View Gallery:** `pollinations gallery`
+* **Storage:** Logs are stored in `~/.pollinations_history.json`.
 ### History and Replay
 The CLI maintains an append-only log of the last 50 operations in ~/.pollinations/history.jsonl.
  * View History:`pollinations history`
