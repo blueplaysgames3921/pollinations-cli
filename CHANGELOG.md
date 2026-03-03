@@ -2,6 +2,13 @@
 
 All notable changes to the Pollinations CLI will be documented in this file.
 
+## [1.1.1] - 2026-03-03
+### Fixed
+- **Chat API Authorization**: Fixed a bug where `chat` bypassed the global API configuration. It now correctly uses `getApi()` for authorized requests to `/v1/chat/completions`.
+- **Response Parsing**: Fixed chat response handling to correctly parse the OpenAI-compatible data structure.
+
+---
+
 ## [1.1.0] - 2026-03-03
 ### Added
 - **Interactive Chat Mode**: Added `pollinations chat` for persistent AI conversations with session memory (context) and system prompt support.
