@@ -37,13 +37,20 @@ export class AgentOrchestrator {
       });
 
       const content = response.data.choices[0].message.content;
-      console.log(chalk.blue(`\n🐝 [Thought]:`) + chalk.white(` ${content}`));
       this.history.push({ role: 'assistant', content });
+
+      const reasoning = content.replace(/\{[\s\S]*?"tool"[\s\S]*?\}/g, '').trim();
+      
+      if (reasoning) {
+        console.log(chalk.blue(`\n🐝 [Pollina]:`) + chalk.white(` ${reasoning}`));
+      } else if (content.includes('"tool"')) {
+        console.log(chalk.blue(`\n🐝 [Pollina]:`) + chalk.dim(` Preparing to execute automated task...`));
+      }
 
       const action = this.parseAction(content);
       if (!action) break;
 
-      process.stdout.write(chalk.yellow(`⚙️  [Executing]: ${action.tool}... `));
+      process.stdout.write(chalk.yellow(`⚙️  [Action]: ${action.tool}... `));
       
       try {
         let result;
@@ -68,6 +75,19 @@ export class AgentOrchestrator {
         this.history.push({ role: 'system', content: `Error: ${err.message}` });
       }
     }
+
+    if (this.history[this.history.length - 1].role === 'system') {
+      const summaryRes = await this.api.post('/v1/chat/completions', {
+        model: this.config.roles.coder,
+        messages: [
+          ...this.history,
+          { role: 'system', content: 'The task loop is complete. Provide a direct and friendly final summary of your achievements to the user. Do not use any more tools.' }
+        ]
+      });
+      const finalMsg = summaryRes.data.choices[0].message.content;
+      console.log(chalk.blue(`\n🐝 [Summary]:`) + chalk.white(` ${finalMsg}`));
+      this.history.push({ role: 'assistant', content: finalMsg });
+    }
     
     console.log(chalk.bold.green('\n✔ Task finalized.'));
   }
@@ -81,11 +101,10 @@ Rules: ${this.config.constraints.join(', ')}
 Local Tools: ${JSON.stringify(this.localTools.getToolDefinitions())}
 MCP Tools: ${JSON.stringify(mcpTools)}
 
-Respond in two parts:
-1. Reasoning: Explain what you are doing.
-2. Action: Use a JSON block to call a tool.
-Format: {"tool": "name", "server": "local|serverName", "args": {}}
-If you are done, do not provide a JSON block.`;
+Instructions:
+1. Always explain what you are doing clearly to the user.
+2. If you need to act, use a JSON block: {"tool": "name", "server": "local|serverName", "args": {}}
+3. If you have finished the user's request, provide a comprehensive summary and stop.`;
   }
 
   async validateAction(action, result) {
@@ -109,3 +128,4 @@ If you are done, do not provide a JSON block.`;
     }
   }
 }
+
