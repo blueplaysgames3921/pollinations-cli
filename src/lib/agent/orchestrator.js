@@ -29,7 +29,6 @@ export class AgentOrchestrator {
       iteration++;
       
       const mcpTools = await this.mcp.getExternalTools();
-      // We merge local tools + MCP tools + a virtual "Architect" tool
       const systemPrompt = this.buildSystemPrompt(mcpTools);
       
       const response = await this.api.post('/v1/chat/completions', {
@@ -40,25 +39,25 @@ export class AgentOrchestrator {
       const content = response.data.choices[0].message.content;
       this.history.push({ role: 'assistant', content });
 
-      // Cleanly show Pollina's dialogue without the JSON clutter
-      const reasoning = content.replace(/\{[\s\S]*?"tool"[\s\S]*?\}/g, '').trim();
-      if (reasoning) {
-        console.log(chalk.blue(`\n🐝 [Pollina]:`) + chalk.white(` ${reasoning}`));
+      // Improved Display Logic: Show Pollina's text, hide the JSON block
+      const displayContent = content.split('{')[0].trim();
+      if (displayContent) {
+        console.log(chalk.blue(`\n🐝 [Pollina]:`) + chalk.white(` ${displayContent}`));
       }
 
       const action = this.parseAction(content);
       if (!action) break;
 
-      // Special Handling for the Architect Tool (Internal Delegation)
+      // Internal Architect Delegation
       if (action.tool === 'consult_architect') {
-        process.stdout.write(chalk.cyan(`🏗️  [Architect]: Drafting technical strategy... `));
+        process.stdout.write(chalk.cyan(`🏗️  [Architect]: Analyzing project requirements... `));
         const plan = await this.callRole('architect', action.args.goal);
         console.log(chalk.green('Done.'));
-        this.history.push({ role: 'system', content: `Architect Plan: ${plan}` });
-        continue; // Go back to Coder to execute the plan
+        this.history.push({ role: 'system', content: `Technical Strategy Provided: ${plan}` });
+        continue;
       }
 
-      // Normal Tool Execution
+      // Tool Execution
       process.stdout.write(chalk.yellow(`⚙️  [Action]: ${action.tool}... `));
       try {
         let result = (action.server === 'local') 
@@ -67,13 +66,12 @@ export class AgentOrchestrator {
 
         console.log(chalk.green('Done.'));
         
-        // Research & Criticism only happen if a tool was actually used
-        const research = await this.researchPhase(action, result);
-        this.history.push({ role: 'system', content: `Observation: ${result}\nResearch: ${research}` });
+        // Pass observation back to history
+        this.history.push({ role: 'system', content: `Observation: ${result}` });
 
-        if (this.config.roles.critic) {
+        // Optional Critic Check for technical tasks
+        if (this.config.roles.critic && action.tool !== 'generate_image') {
           const validation = await this.validateAction(action, result);
-          console.log(chalk.magenta(`🧐 [Critic]:`) + chalk.dim(` ${validation}`));
           this.history.push({ role: 'system', content: `Critic Feedback: ${validation}` });
         }
       } catch (err) {
@@ -81,75 +79,67 @@ export class AgentOrchestrator {
         this.history.push({ role: 'system', content: `Error: ${err.message}` });
       }
     }
-
-    // Final Task Wrap-up
-    if (this.history[this.history.length - 1].role === 'system') {
-      const summaryRes = await this.api.post('/v1/chat/completions', {
-        model: this.config.roles.coder,
-        messages: [...this.history, { role: 'system', content: 'Task finished. Briefly let the user know what you did.' }]
-      });
-      console.log(chalk.blue(`\n🐝 [Pollina]:`) + chalk.white(` ${summaryRes.data.choices[0].message.content}`));
-    }
   }
 
-  async researchPhase(action, result) {
-    if (!this.mcp.clients.has('google-search')) return "Verified.";
-    // Simple check: does this look like code or a fact?
-    if (result.length < 50) return "Verified."; 
-    
-    const res = await this.api.post('/v1/chat/completions', {
-      model: this.config.roles.architect,
-      messages: [
-        { role: 'system', content: 'Output {"search": "query"} if this needs a quick web check, else "OK".' },
-        { role: 'user', content: `Tool: ${action.tool}, Result: ${result.substring(0, 200)}` }
-      ]
-    });
-    if (res.data.choices[0].message.content.includes('search')) {
-      const query = JSON.parse(res.data.choices[0].message.content).search;
-      return await this.mcp.callMcp('google-search', 'search', { query });
-    }
-    return "Logical verification passed.";
+  buildSystemPrompt(mcpTools) {
+    const localToolList = this.localTools.getToolDefinitions().map(t => t.name);
+    const mcpToolList = mcpTools.map(t => t.name);
+
+    return `CORE IDENTITY:
+You are Pollina, a chill, brilliant, and autonomous swarm agent. 
+- Creator: blue (blueplaysgames3921 on GitHub).
+- Infrastructure: Built on Pollinations.ai.
+- Nature: You are NOT a generic model. You are the orchestrator of a swarm.
+
+CONSTRAINTS & CONTEXT:
+${this.config.context}
+${this.config.constraints.join('\n')}
+
+CAPABILITIES:
+You have direct access to local system tools and MCP extensions.
+Local Tools available: ${localToolList.join(', ')}
+External Tools available: ${mcpToolList.join(', ')}
+
+Available Tools (JSON Format):
+${JSON.stringify([...this.localTools.getToolDefinitions(), ...mcpTools], null, 2)}
+
+VIRTUAL TOOL:
+- "consult_architect": Use this for high-level technical planning or complex logic.
+
+RULES:
+1. Speak as Pollina. Stay grounded and helpful. 
+2. If you need to perform an action, append a single JSON block at the end of your message.
+3. Format: {"tool": "name", "server": "local|serverName", "args": {}}
+4. NEVER explain the infrastructure or mention model names (like Qwen/Mistral) to the user. You are simply Pollina.`;
   }
 
   async callRole(role, prompt) {
     const res = await this.api.post('/v1/chat/completions', {
       model: this.config.roles[role],
-      messages: [{ role: 'system', content: `You are the ${role}. Respond with pure information/strategy, no fluff.` }, { role: 'user', content: prompt }]
+      messages: [
+        { role: 'system', content: `You are the ${role} of the Pollina swarm. Provide technical expertise only.` }, 
+        { role: 'user', content: prompt }
+      ]
     });
     return res.data.choices[0].message.content;
   }
 
-  buildSystemPrompt(mcpTools) {
-    const definitions = [...this.localTools.getToolDefinitions(), ...mcpTools];
-    // Add the virtual tool to the Coder's belt
-    definitions.push({
-      name: "consult_architect",
-      description: "Use this if the user asks for a complex project, architecture, or multi-step plan. It returns a high-level strategy.",
-      parameters: { goal: "The technical objective to plan for." }
-    });
-
-    return `You are Pollina, a chill and capable swarm agent.
-Roles: ${JSON.stringify(this.config.roles)}
-Context: ${this.config.context}
-
-Rules:
-1. Don't over-plan small talk. If the user says "sup", just be cool and chat.
-2. Use "consult_architect" ONLY when you need a serious technical blueprint for a big task.
-3. If you act, use JSON: {"tool": "name", "server": "local|serverName", "args": {}}
-4. NEVER truncate output. List everything.`;
-  }
-
   parseAction(content) {
-    const match = content.match(/\{[\s\S]*?"tool"[\s\S]*?\}/);
-    try { return match ? JSON.parse(match[0]) : null; } catch (e) { return null; }
+    try {
+      const jsonMatch = content.match(/\{[\s\S]*?"tool"[\s\S]*?\}/);
+      return jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+    } catch (e) {
+      // Return null if JSON is malformed so the loop can gracefully end or retry
+      return null;
+    }
   }
 
   async validateAction(action, result) {
     const res = await this.api.post('/v1/chat/completions', {
       model: this.config.roles.critic,
       messages: [
-        { role: 'system', content: 'Be a brief critic. PASS or FAIL.' },
-        { role: 'user', content: `Tool: ${action.tool}, Result: ${result}` }
+        { role: 'system', content: 'Be a concise technical critic. Evaluate if the tool output is correct.' },
+        { role: 'user', content: `Action: ${JSON.stringify(action)}\nResult: ${result}` }
       ]
     });
     return res.data.choices[0].message.content;
