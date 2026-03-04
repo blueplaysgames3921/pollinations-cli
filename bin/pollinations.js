@@ -4,6 +4,7 @@ import { textAction } from '../src/commands/text.js';
 import { imageAction } from '../src/commands/image.js';
 import { listModels } from '../src/commands/models.js';
 import { batchAction } from '../src/commands/batch.js';
+import { assistAction } from '../src/commands/assist.js';
 import { profileAction } from '../src/commands/profile.js';
 import { videoAction } from '../src/commands/video.js';
 import { audioAction } from '../src/commands/audio.js';
@@ -14,7 +15,7 @@ import { templateSave, templateRun } from '../src/commands/template.js';
 import { config } from '../src/lib/config-store.js';
 import chalk from 'chalk';
 
-program.name('pollinations').version('1.1.1');
+program.name('pollinations').version('1.2.0');
 
 program.command('login <key>')
   .action((key) => {
@@ -56,6 +57,11 @@ program.command('video <prompt>')
   .option('--seed <number>', 'Manual seed')
   .action(videoAction);
 
+program
+  .command('assist')
+  .alias('pollina')
+  .description('Start the autonomous swarm agent')
+  .action(assistAction);
 
 program.command('models')
   .option('-t, --type <type>', 'Filter (text/image/video/audio)')
