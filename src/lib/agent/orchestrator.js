@@ -10,7 +10,7 @@ export class AgentOrchestrator {
     this.localTools = new ToolManager();
     this.mcp = new MCPManager();
     this.history = [];
-    this.maxIterations = 10;
+    this.maxIterations = 15; 
   }
 
   async init() {
@@ -22,35 +22,38 @@ export class AgentOrchestrator {
   }
 
   async run(userInput) {
+    console.log(chalk.bold.blue('\n🏗️  [Phase 1: Architecture & Planning]'));
+    const plan = await this.callRole('architect', `Create a detailed technical plan for: ${userInput}`);
+    console.log(chalk.white(plan));
+    this.history.push({ role: 'system', content: `Current Plan: ${plan}` });
+
     this.history.push({ role: 'user', content: userInput });
     let iteration = 0;
 
     while (iteration < this.maxIterations) {
       iteration++;
-      
       const mcpTools = await this.mcp.getExternalTools();
-      const systemPrompt = this.buildSystemPrompt(mcpTools);
       
       const response = await this.api.post('/v1/chat/completions', {
         model: this.config.roles.coder,
-        messages: [{ role: 'system', content: systemPrompt }, ...this.history]
+        messages: [{ role: 'system', content: this.buildSystemPrompt(mcpTools) }, ...this.history]
       });
 
       const content = response.data.choices[0].message.content;
+      console.log(chalk.blue(`\n🐝 [Pollina]:`) + chalk.white(` ${content}`));
       this.history.push({ role: 'assistant', content });
-
-      const reasoning = content.replace(/\{[\s\S]*?"tool"[\s\S]*?\}/g, '').trim();
-      
-      if (reasoning) {
-        console.log(chalk.blue(`\n🐝 [Pollina]:`) + chalk.white(` ${reasoning}`));
-      } else if (content.includes('"tool"')) {
-        console.log(chalk.blue(`\n🐝 [Pollina]:`) + chalk.dim(` Preparing to execute automated task...`));
-      }
 
       const action = this.parseAction(content);
       if (!action) break;
 
-      process.stdout.write(chalk.yellow(`⚙️  [Action]: ${action.tool}... `));
+      if (action.tool === 'generate_image') {
+        console.log(chalk.magenta('🎨 [Artist Phase]: Delegating to vision model...'));
+        const result = await this.localTools.call('generate_image', { ...action.args, model: this.config.roles.artist });
+        this.history.push({ role: 'system', content: `Artist Output: ${result}` });
+        continue;
+      }
+
+      process.stdout.write(chalk.yellow(`⚙️  [Executing]: ${action.tool}... `));
       
       try {
         let result;
@@ -59,73 +62,87 @@ export class AgentOrchestrator {
         } else {
           result = await this.mcp.callMcp(action.server, action.tool, action.args);
         }
-
         console.log(chalk.green('Done.'));
+
+        const research = await this.researchPhase(action, result);
+        this.history.push({ role: 'system', content: `Observation: ${result}\nResearch/Validation: ${research}` });
         
         if (this.config.roles.critic) {
           const validation = await this.validateAction(action, result);
-          this.history.push({ role: 'system', content: `Observation: ${result}\nCritic Feedback: ${validation}` });
           console.log(chalk.magenta(`🧐 [Critic]:`) + chalk.dim(` ${validation}`));
-        } else {
-          this.history.push({ role: 'system', content: `Observation: ${result}` });
+          this.history.push({ role: 'system', content: `Critic Feedback: ${validation}` });
         }
-
       } catch (err) {
         console.log(chalk.red('Failed.'));
         this.history.push({ role: 'system', content: `Error: ${err.message}` });
       }
     }
-
-    if (this.history[this.history.length - 1].role === 'system') {
-      const summaryRes = await this.api.post('/v1/chat/completions', {
-        model: this.config.roles.coder,
-        messages: [
-          ...this.history,
-          { role: 'system', content: 'The task loop is complete. Provide a direct and friendly final summary of your achievements to the user. Do not use any more tools.' }
-        ]
-      });
-      const finalMsg = summaryRes.data.choices[0].message.content;
-      console.log(chalk.blue(`\n🐝 [Summary]:`) + chalk.white(` ${finalMsg}`));
-      this.history.push({ role: 'assistant', content: finalMsg });
-    }
     
-    console.log(chalk.bold.green('\n✔ Task finalized.'));
+    await this.finalSummary();
+  }
+
+  async researchPhase(action, result) {
+    if (!this.mcp.clients.has('google-search')) return "No search tool available for deep research.";
+    
+    console.log(chalk.cyan('🔍 [Researcher Phase]: Verifying technical implementation...'));
+    const res = await this.api.post('/v1/chat/completions', {
+      model: this.config.roles.architect,
+      messages: [
+        { role: 'system', content: 'You are a technical researcher. Decide if this tool output needs web verification for modern best practices. If yes, output a search query JSON: {"search": "query"}. If no, say "VERIFIED".' },
+        { role: 'user', content: `Action: ${action.tool}\nResult: ${result.substring(0, 500)}` }
+      ]
+    });
+
+    const decision = res.data.choices[0].message.content;
+    if (decision.includes('search')) {
+      const query = JSON.parse(decision).search;
+      return await this.mcp.callMcp('google-search', 'search', { query });
+    }
+    return decision;
+  }
+
+  async callRole(role, prompt) {
+    const res = await this.api.post('/v1/chat/completions', {
+      model: this.config.roles[role],
+      messages: [{ role: 'system', content: `You are the ${role}. Perform your task based on the AGENTS.md context.` }, { role: 'user', content: prompt }]
+    });
+    return res.data.choices[0].message.content;
+  }
+
+  async finalSummary() {
+    const summary = await this.callRole('architect', 'Summarize the final state of the project and all changes made.');
+    console.log(chalk.bold.green('\n✔ Swarm Task Complete:'));
+    console.log(chalk.white(summary));
   }
 
   buildSystemPrompt(mcpTools) {
-    return `You are Pollina, an autonomous swarm agent.
+    return `You are Pollina, a multimodal swarm.
 Roles: ${JSON.stringify(this.config.roles)}
 Context: ${this.config.context}
-Rules: ${this.config.constraints.join(', ')}
+Constraints: ${this.config.constraints.join('. ')}
+Tools: ${JSON.stringify([...this.localTools.getToolDefinitions(), ...mcpTools])}
 
-Local Tools: ${JSON.stringify(this.localTools.getToolDefinitions())}
-MCP Tools: ${JSON.stringify(mcpTools)}
+Rules:
+1. Speak clearly before acting.
+2. NEVER truncate code lists or JSON.
+3. Call tools using: {"tool": "name", "server": "local|serverName", "args": {}}`;
+  }
 
-Instructions:
-1. Always explain what you are doing clearly to the user.
-2. If you need to act, use a JSON block: {"tool": "name", "server": "local|serverName", "args": {}}
-3. If you have finished the user's request, provide a comprehensive summary and stop.`;
+  parseAction(content) {
+    const jsonMatch = content.match(/\{[\s\S]*?"tool"[\s\S]*?\}/);
+    if (!jsonMatch) return null;
+    try { return JSON.parse(jsonMatch[0]); } catch (e) { return null; }
   }
 
   async validateAction(action, result) {
     const res = await this.api.post('/v1/chat/completions', {
       model: this.config.roles.critic,
       messages: [
-        { role: 'system', content: 'You are a technical critic. Evaluate if the tool output is correct for the intended task. Be concise.' },
+        { role: 'system', content: 'You are a critic. Does the tool result align with the architect plan? Reply PASS or explain errors.' },
         { role: 'user', content: `Action: ${JSON.stringify(action)}\nResult: ${result}` }
       ]
     });
     return res.data.choices[0].message.content;
-  }
-
-  parseAction(content) {
-    const jsonMatch = content.match(/\{[\s\S]*?"tool"[\s\S]*?\}/);
-    if (!jsonMatch) return null;
-    try {
-      return JSON.parse(jsonMatch[0]);
-    } catch (e) {
-      return null;
-    }
   }
 }
 
