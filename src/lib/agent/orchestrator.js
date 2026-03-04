@@ -34,6 +34,69 @@ export class AgentOrchestrator {
     }
   }
 
+  // A bulletproof JSON extractor that safely counts brackets and ignores strings
+  extractJSON(str, startChar, endChar, startIndex) {
+    let depth = 0;
+    let inString = false;
+    let escapeNext = false;
+    
+    for (let i = startIndex; i < str.length; i++) {
+      const char = str[i];
+      
+      if (!escapeNext) {
+        if (char === '"') inString = !inString;
+        else if (!inString) {
+          if (char === startChar) depth++;
+          else if (char === endChar) depth--;
+        }
+      }
+      escapeNext = (char === '\\' && !escapeNext);
+      
+      if (depth === 0 && !inString) {
+        return str.substring(startIndex, i + 1);
+      }
+    }
+    return null;
+  }
+
+  parseAction(content, mcpTools) {
+    try {
+      // 1. Catch the OpenAI tool call array leak (this is what caused the bug)
+      const oaiIndex = content.indexOf('[{"id"');
+      if (oaiIndex !== -1) {
+        const jsonStr = this.extractJSON(content, '[', ']', oaiIndex);
+        if (jsonStr) {
+          const parsed = JSON.parse(jsonStr);
+          const call = parsed[0];
+          const funcName = call.function?.name || call.name; 
+          const rawArgs = call.function?.arguments || call.arguments;
+          
+          // OpenAI returns arguments as a stringified JSON. We must parse it again.
+          const args = typeof rawArgs === 'string' ? JSON.parse(rawArgs) : rawArgs;
+          
+          // Dynamically map server
+          let server = 'local';
+          const isLocal = this.localTools.getToolDefinitions().some(t => t.name === funcName);
+          if (!isLocal && mcpTools) {
+            const mcpDef = mcpTools.find(t => t.name === funcName);
+            if (mcpDef) server = mcpDef.server;
+          }
+          return { tool: funcName, server, args };
+        }
+      }
+
+      // 2. Catch custom format fallback
+      const customIndex = content.indexOf('{"tool"');
+      if (customIndex !== -1) {
+        const jsonStr = this.extractJSON(content, '{', '}', customIndex);
+        if (jsonStr) return JSON.parse(jsonStr);
+      }
+    } catch (e) {
+      // Silently fail and return null so the loop continues instead of crashing
+    }
+    return null;
+  }
+
   async run(userInput) {
     this.history.push({ role: 'user', content: userInput });
     let iteration = 0;
@@ -52,22 +115,31 @@ export class AgentOrchestrator {
       const content = response.data.choices[0].message.content;
       this.history.push({ role: 'assistant', content });
 
-      // Clean display logic: Strip JSON blocks and Markdown fences so only speech shows
-      const reasoning = content
-        .replace(/```json\s*\{[\s\S]*?\}\s*```/g, '') // Remove fenced JSON
-        .replace(/\{[\s\S]*?"tool"[\s\S]*?\}/g, '')    // Remove raw JSON
-        .trim();
+      // Clean display logic: Use our extractor to perfectly strip the JSON payloads from the terminal UI
+      let reasoning = content;
+      
+      const oaiIndex = reasoning.indexOf('[{"id"');
+      if (oaiIndex !== -1) {
+        const jsonStr = this.extractJSON(reasoning, '[', ']', oaiIndex);
+        if (jsonStr) reasoning = reasoning.replace(jsonStr, '');
+      }
+
+      const customIndex = reasoning.indexOf('{"tool"');
+      if (customIndex !== -1) {
+        const jsonStr = this.extractJSON(reasoning, '{', '}', customIndex);
+        if (jsonStr) reasoning = reasoning.replace(jsonStr, '');
+      }
+
+      reasoning = reasoning.replace(/```json[\s\S]*?```/g, '').trim();
       
       if (reasoning) {
         process.stdout.write(`\n${this.colors.pollina('🐝 [Pollina]:')} ${chalk.white(reasoning)}\n`);
       }
 
-      const action = this.parseAction(content);
+      const action = this.parseAction(content, mcpTools);
       
-      // If no action tool is called, the agent has finished its thought/task
       if (!action) break;
 
-      // Special Architect Phase
       if (action.tool === 'consult_architect') {
         console.log(`\n${this.colors.architect('🏗️  [Architect]:')} ${chalk.dim('Strategic Planning...')}`);
         const plan = await this.callRole('architect', action.args.goal);
@@ -76,16 +148,14 @@ export class AgentOrchestrator {
         continue; 
       }
 
-      // Execute Tool
-      process.stdout.write(`${this.colors.action('⚙️  [Action]:')} ${chalk.dim(action.tool)}... `);
+      process.stdout.write(`${this.colors.action('⚙️  [Action]:')} ${chalk.bold.white(action.tool)}... `);
       try {
-        let result = (action.server === 'local') 
+        let result = (action.server === 'local' || !action.server) 
           ? await this.localTools.call(action.tool, action.args) 
           : await this.mcp.callMcp(action.server, action.tool, action.args);
 
         process.stdout.write(chalk.green('SUCCESS\n'));
         
-        // Research/Validation
         const research = await this.researchPhase(action, result);
         this.history.push({ 
             role: 'system', 
@@ -104,7 +174,6 @@ export class AgentOrchestrator {
       }
     }
 
-    // Wrap-up 
     const lastMsg = this.history[this.history.length - 1];
     if (lastMsg.role === 'system' || iteration >= this.maxIterations) {
       const summaryRes = await this.api.post('/v1/chat/completions', {
@@ -173,31 +242,13 @@ ENVIRONMENT:
 
 STRICT AGENT PROTOCOLS:
 1. NO YAPPING: Do not explain that you are an AI or that you are "trying" to create a file. Just use the tool.
-2. TOOL FORMAT: You MUST call tools using a single JSON block: {"tool": "name", "server": "local|server", "args": {}}
-3. VERIFICATION: After using "write_file", you should ideally use "list_files" or "read_file" in the next iteration to confirm the file exists. Do not assume success.
-4. NO TRUNCATION: Always output full file contents and full directory listings.
-5. CODE HANDLING: Do not paste the code you are writing into your speech/reasoning if you are also using a tool to write it. The tool output is what matters.
+2. YOU MUST ACTUALLY CALL TOOLS: Do not just output code blocks. If you want to write a file, you must output the JSON payload.
+3. NEVER ASSUME SUCCESS: If you call "write_file", do not act like it succeeded until the system replies to you with "SUCCESS".
+4. NO TRUNCATION: Always output full file contents.
+5. DO NOT PASTE CODE IN YOUR SPEECH: Place the code directly into the tool arguments.
 
 Available Tools:
 ${JSON.stringify(definitions)}`;
-  }
-
-  parseAction(content) {
-    // Improved regex to find JSON even if wrapped in markdown or mixed with text
-    const jsonRegex = /\{[\s\S]*?"tool"[\s\S]*?\}/;
-    const match = content.match(jsonRegex);
-    if (!match) return null;
-    try {
-      return JSON.parse(match[0]);
-    } catch (e) {
-      // Fallback: try to clean up common AI formatting errors
-      try {
-        const cleaned = match[0].replace(/\\n/g, '\n').replace(/\\"/g, '"');
-        return JSON.parse(cleaned);
-      } catch (innerE) {
-        return null;
-      }
-    }
   }
 
   async validateAction(action, result) {
