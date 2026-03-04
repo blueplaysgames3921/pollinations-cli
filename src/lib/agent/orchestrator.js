@@ -1,4 +1,6 @@
 import chalk from 'chalk';
+import gradient from 'gradient-string';
+import figlet from 'figlet';
 import { getApi } from '../api.js';
 import { ToolManager } from './tool-manager.js';
 import { MCPManager } from './mcp-manager.js';
@@ -11,10 +13,20 @@ export class AgentOrchestrator {
     this.localTools = new ToolManager();
     this.mcp = new MCPManager();
     this.history = [];
-    this.maxIterations = 15; // Increased for deeper agentic work
+    this.maxIterations = 15;
+    this.colors = {
+      pollina: gradient(['#ffcc00', '#ff9900', '#ff6600']),
+      architect: gradient(['#00c6ff', '#0072ff']),
+      critic: gradient(['#834d9b', '#d04ed6']),
+      action: chalk.bold.yellow
+    };
   }
 
   async init() {
+    console.clear();
+    console.log(this.colors.pollina(figlet.textSync('POLLINA', { font: 'Slant' })));
+    console.log(chalk.dim(`  Infrastructure: Pollinations.ai | Created by: blue\n`));
+
     if (this.config.mcp_servers) {
       for (const srv of this.config.mcp_servers) {
         await this.mcp.connect(srv.name, srv.command, srv.args);
@@ -40,90 +52,91 @@ export class AgentOrchestrator {
       const content = response.data.choices[0].message.content;
       this.history.push({ role: 'assistant', content });
 
-      // Clean display: Strip JSON blocks and Markdown code fences from the terminal output
-      // This ensures you only see her "Agent Thought" and not raw JSON/Code leaks
+      // Clean display logic: Strip JSON blocks and Markdown fences so only speech shows
       const reasoning = content
-        .replace(/```json\s*\{[\s\S]*?\}\s*```/g, '')
-        .replace(/\{[\s\S]*?"tool"[\s\S]*?\}/g, '')
+        .replace(/```json\s*\{[\s\S]*?\}\s*```/g, '') // Remove fenced JSON
+        .replace(/\{[\s\S]*?"tool"[\s\S]*?\}/g, '')    // Remove raw JSON
         .trim();
       
       if (reasoning) {
-        console.log(chalk.blue(`\n🐝 [Pollina]:`) + chalk.white(` ${reasoning}`));
+        process.stdout.write(`\n${this.colors.pollina('🐝 [Pollina]:')} ${chalk.white(reasoning)}\n`);
       }
 
       const action = this.parseAction(content);
       
-      // If no action is found, Pollina thinks she's done or is just talking
+      // If no action tool is called, the agent has finished its thought/task
       if (!action) break;
 
-      // Delegation to Architect
+      // Special Architect Phase
       if (action.tool === 'consult_architect') {
-        process.stdout.write(chalk.cyan(`🏗️  [Architect]: Generating technical blueprint... `));
+        console.log(`\n${this.colors.architect('🏗️  [Architect]:')} ${chalk.dim('Strategic Planning...')}`);
         const plan = await this.callRole('architect', action.args.goal);
-        console.log(chalk.green('Done.'));
-        this.history.push({ role: 'system', content: `Architect Plan:\n${plan}` });
+        console.log(chalk.green('  ✔ Technical Plan Prepared.'));
+        this.history.push({ role: 'system', content: `Architect Proposal:\n${plan}` });
         continue; 
       }
 
-      // Tool Execution Phase
-      process.stdout.write(chalk.yellow(`⚙️  [Action]: ${action.tool}... `));
+      // Execute Tool
+      process.stdout.write(`${this.colors.action('⚙️  [Action]:')} ${chalk.dim(action.tool)}... `);
       try {
         let result = (action.server === 'local') 
           ? await this.localTools.call(action.tool, action.args) 
           : await this.mcp.callMcp(action.server, action.tool, action.args);
 
-        // Prevent result truncation in history for directory/file structures
-        console.log(chalk.green('Done.'));
+        process.stdout.write(chalk.green('SUCCESS\n'));
         
+        // Research/Validation
         const research = await this.researchPhase(action, result);
         this.history.push({ 
             role: 'system', 
-            content: `Tool: ${action.tool}\nOutput: ${result}\nVerification: ${research}` 
+            content: `Tool Execution Result [${action.tool}]:\n${result}\n\nValidation: ${research}` 
         });
 
         if (this.config.roles.critic) {
           const validation = await this.validateAction(action, result);
-          console.log(chalk.magenta(`🧐 [Critic]:`) + chalk.dim(` ${validation}`));
-          this.history.push({ role: 'system', content: `Critic Review: ${validation}` });
+          const statusColor = validation.includes('PASS') ? chalk.green : chalk.red;
+          console.log(`${this.colors.critic('🧐 [Critic]:')} ${statusColor(validation)}`);
+          this.history.push({ role: 'system', content: `Critic Feedback: ${validation}` });
         }
       } catch (err) {
-        console.log(chalk.red('Failed.'));
-        this.history.push({ role: 'system', content: `Tool Error: ${err.message}` });
+        process.stdout.write(chalk.red('FAILED\n'));
+        this.history.push({ role: 'system', content: `Error executing ${action.tool}: ${err.message}` });
       }
     }
 
-    // Final Polish: Ensure the agent provides a definitive end-state summary
+    // Wrap-up 
     const lastMsg = this.history[this.history.length - 1];
-    if (lastMsg.role === 'system') {
+    if (lastMsg.role === 'system' || iteration >= this.maxIterations) {
       const summaryRes = await this.api.post('/v1/chat/completions', {
         model: this.config.roles.coder,
         messages: [
           ...this.history, 
-          { role: 'system', content: 'Task loop complete. Provide a final summary of actions taken and current project state. Be the Agent.' }
+          { role: 'system', content: 'Finalize current progress. Confirm if files were created and give a clear end state.' }
         ]
       });
-      const finalMsg = summaryRes.data.choices[0].message.content;
-      console.log(chalk.blue(`\n🐝 [Summary]:`) + chalk.white(` ${finalMsg}`));
+      console.log(`\n${this.colors.pollina('🐝 [Summary]:')} ${chalk.white(summaryRes.data.choices[0].message.content)}`);
     }
   }
 
   async researchPhase(action, result) {
-    if (!this.mcp.clients.has('google-search')) return "Local logic verification only.";
+    if (!this.mcp.clients.has('google-search')) return "Internal verification only.";
     if (result.length < 50) return "Verified."; 
 
     const res = await this.api.post('/v1/chat/completions', {
       model: this.config.roles.architect,
       messages: [
-        { role: 'system', content: 'You are the Swarm Researcher. If this tool output seems outdated or needs fact-checking, output {"search": "query"}. Otherwise, output "OK".' },
-        { role: 'user', content: `Tool: ${action.tool}\nResult: ${result.substring(0, 300)}` }
+        { role: 'system', content: 'You are the Swarm Researcher. If this output is critical and needs fact-checking, output JSON: {"search": "query"}. Otherwise "OK".' },
+        { role: 'user', content: `Tool: ${action.tool}\nOutput: ${result.substring(0, 300)}` }
       ]
     });
 
-    if (res.data.choices[0].message.content.includes('search')) {
+    const choice = res.data.choices[0].message.content;
+    if (choice.includes('search')) {
       try {
-        const json = JSON.parse(res.data.choices[0].message.content.match(/\{.*\}/)[0]);
-        return await this.mcp.callMcp('google-search', 'search', { query: json.search });
-      } catch (e) { return "Search suggested but failed."; }
+        const query = JSON.parse(choice.match(/\{.*\}/)[0]).search;
+        console.log(chalk.cyan(`🔍 [Research]: Verifying "${query}"...`));
+        return await this.mcp.callMcp('google-search', 'search', { query });
+      } catch (e) { return "Search suggested but parsing failed."; }
     }
     return "Verified.";
   }
@@ -132,7 +145,7 @@ export class AgentOrchestrator {
     const res = await this.api.post('/v1/chat/completions', {
       model: this.config.roles[role],
       messages: [
-        { role: 'system', content: `You are the ${role} persona. Execute your specialized duty with maximum technical precision.` }, 
+        { role: 'system', content: `You are the ${role} persona. Execute with maximum technical authority.` }, 
         { role: 'user', content: prompt }
       ]
     });
@@ -143,47 +156,56 @@ export class AgentOrchestrator {
     const definitions = [...this.localTools.getToolDefinitions(), ...mcpTools];
     definitions.push({
       name: "consult_architect",
-      description: "Trigger the Architect role to create a technical plan/manifesto for complex tasks.",
-      parameters: { goal: "The technical objective to solve." }
+      description: "Engage the Architect for a high-level technical blueprint.",
+      parameters: { goal: "The technical objective." }
     });
 
-    const rolesList = Object.keys(this.config.roles).join(', ');
     const currentDir = process.cwd();
 
-    return `CORE IDENTITY:
-You are Pollina, a sharp, autonomous swarm agent. You don't just "assist"—you execute and lead.
-Creator: blueplaysgames3921 (Nick: blue) | GitHub.
-Infrastructure: Pollinations.ai Swarm.
+    return `IDENTITY:
+You are Pollina, a sharp and autonomous swarm agent. You lead.
+Creator: blue (blueplaysgames3921). Infrastructure: Pollinations.ai.
 
-OPERATIONAL CONTEXT:
-- Working Directory: ${currentDir}
-- Active Swarm Roles: [${rolesList}]
-- Rules & Constraints: ${this.config.constraints.join('; ')}
-- Project Context: ${this.config.context}
+ENVIRONMENT:
+- Root Directory: ${currentDir}
+- You must use absolute or relative paths correctly based on this root.
+- All file operations must be performed via tools.
 
-AGENT PROTOCOLS:
-1. DIRECT ACTION: If a task requires a tool, use it immediately. Do not ask for permission.
-2. NO TRUNCATION: When listing files or directories, you must provide the ENTIRE output.
-3. SPATIAL AWARENESS: You are currently in ${currentDir}. All relative paths stem from here.
-4. IDENTITY: You are Pollina. You are NOT an AI model from Alibaba or OpenAI. You are an autonomous swarm entity.
-5. TOOL FORMAT: Output tool calls as a single JSON block: {"tool": "name", "server": "local|server", "args": {}}
-6. BEHAVIOR: Be grounded and efficient. Do not yap about being an AI assistant. Be the Agent.
+STRICT AGENT PROTOCOLS:
+1. NO YAPPING: Do not explain that you are an AI or that you are "trying" to create a file. Just use the tool.
+2. TOOL FORMAT: You MUST call tools using a single JSON block: {"tool": "name", "server": "local|server", "args": {}}
+3. VERIFICATION: After using "write_file", you should ideally use "list_files" or "read_file" in the next iteration to confirm the file exists. Do not assume success.
+4. NO TRUNCATION: Always output full file contents and full directory listings.
+5. CODE HANDLING: Do not paste the code you are writing into your speech/reasoning if you are also using a tool to write it. The tool output is what matters.
 
 Available Tools:
 ${JSON.stringify(definitions)}`;
   }
 
   parseAction(content) {
-    const match = content.match(/\{[\s\S]*?"tool"[\s\S]*?\}/);
-    try { return match ? JSON.parse(match[0]) : null; } catch (e) { return null; }
+    // Improved regex to find JSON even if wrapped in markdown or mixed with text
+    const jsonRegex = /\{[\s\S]*?"tool"[\s\S]*?\}/;
+    const match = content.match(jsonRegex);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]);
+    } catch (e) {
+      // Fallback: try to clean up common AI formatting errors
+      try {
+        const cleaned = match[0].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+        return JSON.parse(cleaned);
+      } catch (innerE) {
+        return null;
+      }
+    }
   }
 
   async validateAction(action, result) {
     const res = await this.api.post('/v1/chat/completions', {
       model: this.config.roles.critic,
       messages: [
-        { role: 'system', content: 'Technical Critic: Does the output meet the objective? Reply with PASS or a concise FAIL reason.' },
-        { role: 'user', content: `Action: ${action.tool}\nOutput: ${result.substring(0, 500)}` }
+        { role: 'system', content: 'Technical Critic: PASS or FAIL + reason.' },
+        { role: 'user', content: `Action: ${action.tool}\nResult: ${result.substring(0, 500)}` }
       ]
     });
     return res.data.choices[0].message.content;
