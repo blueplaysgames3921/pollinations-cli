@@ -14,7 +14,7 @@ export class ToolManager {
         const fullPath = path.resolve(process.cwd(), filePath);
         await fs.ensureDir(path.dirname(fullPath));
         await fs.writeFile(fullPath, content);
-        return `Successfully wrote to ${filePath}`;
+        return `Successfully wrote to ${fullPath}`; // Changed to return full path to enforce strict verification
       },
       list_files: async ({ dirPath = '.' }) => {
         const fullPath = path.resolve(process.cwd(), dirPath);
@@ -33,7 +33,7 @@ export class ToolManager {
       delete_file: async ({ filePath }) => {
         const fullPath = path.resolve(process.cwd(), filePath);
         await fs.remove(fullPath);
-        return `Deleted ${filePath}`;
+        return `Deleted ${fullPath}`;
       }
     };
   }
@@ -73,4 +73,3 @@ export class ToolManager {
     return await this.tools[name](args);
   }
 }
-
