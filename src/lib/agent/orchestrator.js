@@ -247,7 +247,7 @@ STRICT AGENT PROTOCOLS(MAJOR HIGHEST PRIORITY):
 7. MANDATORY TOOL FORMAT[HIGHLY NECESSARY]: Output valid JSON only. 
    Example: {"tool": "write_file", "args": {"filePath": "test.txt", "content": "data"}}
    Shorthand like [write_file()] is forbidden. If you use it, the system crashes and the project fails.
-8. IMAGE PLACEMENT: After successfully generating an image make sure to actually add it in the project folder where it's needed. Verify it exists by listing files. Verify the path properly.
+8. IMAGE PLACEMENT: After successfully generating an image make sure to actually add it in the project folder where it's needed. Verify it exists by listing files. Verify the path properly. When generating images for a specific project folder, you MUST include the folder prefix in the fileName (e.g., 'my-project/image.png')."
 
 Available Tools:
 ${JSON.stringify(definitions)}`;
