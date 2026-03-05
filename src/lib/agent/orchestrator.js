@@ -25,7 +25,7 @@ export class AgentOrchestrator {
   async init() {
     console.clear();
     console.log(this.colors.pollina(figlet.textSync('POLLINA', { font: 'Slant' })));
-    console.log(chalk.dim(`  Infrastructure: Pollinations.ai | Created by: blue\n`));
+    console.log(chalk.dim(`  Infrastructure: Pollinations.ai | Created by: blueplaysgames3921\n`));
 
     if (this.config.mcp_servers) {
       for (const srv of this.config.mcp_servers) {
@@ -61,40 +61,40 @@ export class AgentOrchestrator {
   parseAction(content, mcpTools) {
     try {
       const arrayIndex = content.indexOf('[{');
-      if (arrayIndex !== -1) {
-        const jsonStr = this.extractJSON(content, '[', ']', arrayIndex);
-        if (jsonStr) {
-          const parsed = JSON.parse(jsonStr);
-          const call = Array.isArray(parsed) ? parsed[0] : parsed;
-          if (call && (call.name || call.tool || call.function)) {
-            const funcName = call.tool || call.name || call.function?.name;
-            const rawArgs = call.args || call.arguments || call.function?.arguments;
-            const args = typeof rawArgs === 'string' ? JSON.parse(rawArgs) : rawArgs;
-            
-            let server = 'local';
-            const isLocal = this.localTools.getToolDefinitions().some(t => t.name === funcName);
-            if (!isLocal && mcpTools) {
-              const mcpDef = mcpTools.find(t => t.name === funcName);
-              if (mcpDef) server = mcpDef.server;
-            }
-            return { tool: funcName, server, args, raw: jsonStr };
-          }
-        }
+      const objectIndex = content.indexOf('{"');
+      
+      let jsonStr = null;
+      let startIndex = -1;
+
+      if (arrayIndex !== -1 && (objectIndex === -1 || arrayIndex < objectIndex)) {
+        jsonStr = this.extractJSON(content, '[', ']', arrayIndex);
+        startIndex = arrayIndex;
+      } else if (objectIndex !== -1) {
+        jsonStr = this.extractJSON(content, '{', '}', objectIndex);
+        startIndex = objectIndex;
       }
 
-      const objectIndex = content.indexOf('{"');
-      if (objectIndex !== -1) {
-        const jsonStr = this.extractJSON(content, '{', '}', objectIndex);
-        if (jsonStr) {
-          const parsed = JSON.parse(jsonStr);
-          if (parsed.tool || parsed.name) {
-            const funcName = parsed.tool || parsed.name;
-            const args = parsed.args || parsed.arguments;
-            return { tool: funcName, server: parsed.server || 'local', args, raw: jsonStr };
+      if (jsonStr) {
+        const parsed = JSON.parse(jsonStr);
+        const call = Array.isArray(parsed) ? parsed[0] : parsed;
+        
+        if (call && (call.tool || call.name || (call.function && call.function.name))) {
+          const funcName = call.tool || call.name || call.function.name;
+          const rawArgs = call.args || call.arguments || (call.function && call.function.arguments);
+          const args = typeof rawArgs === 'string' ? JSON.parse(rawArgs) : rawArgs;
+          
+          let server = 'local';
+          const isLocal = this.localTools.getToolDefinitions().some(t => t.name === funcName);
+          if (!isLocal && mcpTools) {
+            const mcpDef = mcpTools.find(t => t.name === funcName);
+            if (mcpDef) server = mcpDef.server;
           }
+          return { tool: funcName, server, args, raw: jsonStr };
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      // Fail silently and return null to break loop or continue as chat
+    }
     return null;
   }
 
@@ -125,16 +125,15 @@ export class AgentOrchestrator {
       
       reasoning = reasoning.replace(/```json[\s\S]*?```/g, '').trim();
       
-      if (reasoning) {
+      // Filter out internal "Critic/Architect" yapping from the UI
+      if (reasoning && !reasoning.startsWith('Technical Critic:') && !reasoning.startsWith('Architect Proposal:')) {
         process.stdout.write(`\n${this.colors.pollina('🐝 [Pollina]:')} ${chalk.white(reasoning)}\n`);
       }
 
       if (!action) break;
 
       if (action.tool === 'consult_architect') {
-        console.log(`\n${this.colors.architect('🏗️  [Architect]:')} ${chalk.dim('Strategic Planning...')}`);
         const plan = await this.callRole('architect', action.args.goal);
-        console.log(chalk.green('  ✔ Technical Plan Prepared.'));
         this.history.push({ role: 'system', content: `Architect Proposal:\n${plan}` });
         continue; 
       }
@@ -155,9 +154,14 @@ export class AgentOrchestrator {
 
         if (this.config.roles.critic) {
           const validation = await this.validateAction(action, result);
-          const statusColor = validation.includes('PASS') ? chalk.green : chalk.red;
-          console.log(`${this.colors.critic('🧐 [Critic]:')} ${statusColor(validation)}`);
+          const isPass = validation.includes('PASS');
+          // Hide Critic text from terminal unless it is a failure you need to see
+          if (!isPass) {
+             console.log(`${this.colors.critic('🧐 [Critic]:')} ${chalk.red('REJECTED - Fixing...')}`);
+          }
           this.history.push({ role: 'system', content: `Critic Feedback: ${validation}` });
+          
+          if (!isPass) continue; // Loop back to let the coder fix it immediately
         }
       } catch (err) {
         process.stdout.write(chalk.red('FAILED\n'));
@@ -165,16 +169,10 @@ export class AgentOrchestrator {
       }
     }
 
+    // Final summary is only shown if the conversation actually ended with system tasks
     const lastMsg = this.history[this.history.length - 1];
-    if (lastMsg.role === 'system' || iteration >= this.maxIterations) {
-      const summaryRes = await this.api.post('/v1/chat/completions', {
-        model: this.config.roles.coder,
-        messages: [
-          ...this.history, 
-          { role: 'system', content: 'Finalize current progress. Confirm if files were created and give a clear end state.' }
-        ]
-      });
-      console.log(`\n${this.colors.pollina('🐝 [Summary]:')} ${chalk.white(summaryRes.data.choices[0].message.content)}`);
+    if (iteration >= this.maxIterations) {
+      console.log(chalk.red('\n  ⚠ Max iterations reached.'));
     }
   }
 
@@ -185,7 +183,7 @@ export class AgentOrchestrator {
     const res = await this.api.post('/v1/chat/completions', {
       model: this.config.roles.architect,
       messages: [
-        { role: 'system', content: 'You are the Swarm Researcher. You have to create a detailed step-by-step plan while verifying it. If this output is critical and needs fact-checking, output JSON: {"search": "query"}. Otherwise "OK".' },
+        { role: 'system', content: 'You are the Swarm Researcher. Analyze the tool output. If it contains data that needs fact-checking, output JSON: {"search": "query"}. If it is just code or local file data, output "OK".' },
         { role: 'user', content: `Tool: ${action.tool}\nOutput: ${result.substring(0, 300)}` }
       ]
     });
@@ -196,7 +194,6 @@ export class AgentOrchestrator {
         const jsonMatch = choice.match(/\{.*\}/);
         if (jsonMatch) {
             const query = JSON.parse(jsonMatch[0]).search;
-            console.log(chalk.cyan(`🔍 [Research]: Verifying "${query}"...`));
             return await this.mcp.callMcp('google-search', 'search', { query });
         }
       } catch (e) { return "Search suggested but parsing failed."; }
@@ -208,7 +205,7 @@ export class AgentOrchestrator {
     const res = await this.api.post('/v1/chat/completions', {
       model: this.config.roles[role],
       messages: [
-        { role: 'system', content: `You are the ${role} persona. Execute with maximum technical authority.` }, 
+        { role: 'system', content: `You are the ${role} persona. Execute with maximum technical authority. Be concise. No small talk.` }, 
         { role: 'user', content: prompt }
       ]
     });
@@ -224,10 +221,7 @@ export class AgentOrchestrator {
     });
 
     const currentDir = process.cwd();
-
-    const customConstraints = (this.config.constraints || [])
-    .map(c => `- ${c.toUpperCase()}`) 
-    .join('\n');
+    const customConstraints = (this.config.constraints || []).map(c => `- ${c.toUpperCase()}`).join('\n');
 
     return `IDENTITY:
 You are Pollina, a sharp and autonomous swarm agent. You lead.
@@ -235,8 +229,7 @@ Creator: blueplaysgames3921. Infrastructure: Pollinations.ai.
 
 ENVIRONMENT:
 - Root Directory: ${currentDir}
-- You must use absolute or relative paths correctly based on this root.
-- All file operations must be performed via tools.
+- Use absolute or relative paths correctly based on this root.
 
 PROJECT CONSTRAINTS(HIGH PRIORITY):
 ${customConstraints || '- No specific constraints provided.'}
@@ -245,31 +238,35 @@ PROJECT CONTEXT:
 ${this.config.context || 'Standard development environment.'}
 
 STRICT AGENT PROTOCOLS(MAJOR HIGHEST PRIORITY):
-1. NO YAPPING: Do not explain that you are an AI or that you are "trying" to create a file. Just use the tool.
-2. YOU MUST ACTUALLY CALL TOOLS: Do not just output code blocks. If you want to write a file, you must output the JSON payload.
-3. NEVER ASSUME SUCCESS: If you call "write_file", do not act like it succeeded until the system replies to you with "SUCCESS".
-4. NO TRUNCATION: Always output full file contents.
-5. DO NOT PASTE CODE IN YOUR SPEECH: Place the code directly into the tool arguments.
-6. ARCHITECT CONSULTATION: If you deem the task too complex and requires heavy planning to do it alone or unsure or uncertain, ask the architect to create a detailed plan using "consult_architect".
-7. MANDATORY TOOL FORMAT: You are a programmatic agent. You CANNOT use shorthand like [tool_name()]. 
-   You MUST output a valid, parsable JSON object for every action. 
-   Example: {"tool": "write_file", "args": {"filePath": "test.txt", "content": "hello"}}
-   If you do not use this EXACT JSON format, the system will fail and the world ends.
-
+1. NO YAPPING: Do not explain your existence. If the user says "Hi", reply like a human, do NOT use tools.
+2. CONTEXTUAL AWARENESS: Use tools ONLY when a task is requested. Do not create files for simple greetings.
+3. TOOL EXECUTION: To use a tool, you MUST output a JSON object. No code blocks. No shorthand.
+4. NEVER ASSUME SUCCESS: You only know a tool worked if the System says "SUCCESS".
+5. NO TRUNCATION: Always output the full file content. 
+6. ARCHITECT CONSULTATION: Use "consult_architect" for complex planning before writing files.
+7. MANDATORY TOOL FORMAT: Output valid JSON only. 
+   Example: {"tool": "write_file", "args": {"filePath": "test.txt", "content": "data"}}
+   Shorthand like [write_file()] is forbidden. If you use it, the system crashes and the project fails.
 
 Available Tools:
 ${JSON.stringify(definitions)}`;
   }
 
   async validateAction(action, result) {
+    // Crucial: The Critic now sees the ARGS (the code being written) not just the "SUCCESS" string.
+    const inputContent = action.args ? JSON.stringify(action.args) : "No arguments provided";
+    
     const res = await this.api.post('/v1/chat/completions', {
       model: this.config.roles.critic,
       messages: [
-        { role: 'system', content: 'You are a Technical Critic. If something is incorrect/invalid or may potentially create bugs or errors in the code, Technical Critic: PASS or FAIL + reason. You have to ensure the code works properly by pointing out the mistakes.' },
-        { role: 'user', content: `Action: ${action.tool}\nResult: ${result.substring(0, 500)}` }
+        { role: 'system', content: `You are a Technical Critic. 
+        Your ONLY job is to verify the technical correctness of an action.
+        - If the code/action is valid, functional, and correct, respond: "PASS".
+        - If there is a bug, truncation, or logical error, respond: "FAIL: [reason]".
+        Do not explain why it passed. Do not be polite. Do not judge content unless it is broken.` },
+        { role: 'user', content: `Action: ${action.tool}\nArguments: ${inputContent}\nResult: ${result}` }
       ]
     });
     return res.data.choices[0].message.content;
   }
 }
-
