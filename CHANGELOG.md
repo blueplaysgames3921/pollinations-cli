@@ -2,6 +2,16 @@
 
 All notable changes to the Pollinations CLI will be documented in this file.
 
+## [1.2.1] - 2026-03-05
+### Fixed
+- **Image Path Context**: Fixed a bug where generated images were being dropped in the CLI root instead of the project subfolders. The `generate_image` tool now forces absolute path resolution relative to the current working directory.
+- **Critic "Blindness"**: Updated `validateAction` to pass tool arguments directly to the **Critic**. This allows the agent to verify file contents and code logic before the file is even written.
+- **Agent Behavior**: Added "Conversation Mode" to the system prompt to prevent Pollina from triggered tools during simple greetings (e.g., "Hi").
+- **Terminal Noise Reduction**: Silenced internal Architect and Critic reasoning from the main terminal output. Only Pollina's direct speech and tool status updates are now visible for a cleaner UI.
+- **Improved JSON Extraction**: Enhanced the bracket-counting logic to handle both Object `{}` and Array `[]` JSON payloads more reliably, preventing crashes on complex tool calls.
+
+---
+
 ## [1.2.0] - 2026-03-05
 ### Added
 - **Swarm Agent Orchestrator**: Added `pollinations assist` to launch **Pollina**, an autonomous agent capable of using local and remote tools.
