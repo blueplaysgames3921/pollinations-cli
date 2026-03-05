@@ -68,6 +68,12 @@ Keep track of your batch image generations. Every time you run a `batch` command
 The CLI maintains an append-only log of the last 50 operations in ~/.pollinations/history.jsonl.
  * View History:`pollinations history`
  * Rerun Command: `pollinations replay <id>`
+### Autonomous Agent (Pollina)
+Launch a sharp, autonomous swarm agent that can write files, execute shell commands, and plan architectures.
+* **Start Agent:** `pollinations assist`
+* **Local Intelligence:** Uses `AGENTS.md` in your project root to read specific constraints and context.
+* **Tool-Enabled:** Can perform `read_file`, `write_file`, `shell_exec`, and `generate_image` autonomously.
+* **Multi-Role:** Features an Architect/Coder/Critic loop to ensure technical accuracy before execution.
 ### Templates
 Save reusable prompt structures with variable placeholders.
  * Save: `pollinations template save review "Analyze this {language} code for security: {code}"`
