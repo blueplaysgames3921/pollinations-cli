@@ -244,7 +244,7 @@ STRICT AGENT PROTOCOLS(MAJOR HIGHEST PRIORITY):
 4. NEVER ASSUME SUCCESS: You only know a tool worked if the System says "SUCCESS".
 5. NO TRUNCATION: Always output the full file content. 
 6. ARCHITECT CONSULTATION: Use "consult_architect" for complex planning before writing files.
-7. MANDATORY TOOL FORMAT: Output valid JSON only. 
+7. MANDATORY TOOL FORMAT[HIGHLY NECESSARY]: Output valid JSON only. 
    Example: {"tool": "write_file", "args": {"filePath": "test.txt", "content": "data"}}
    Shorthand like [write_file()] is forbidden. If you use it, the system crashes and the project fails.
 
