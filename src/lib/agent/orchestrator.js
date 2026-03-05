@@ -34,7 +34,6 @@ export class AgentOrchestrator {
     }
   }
 
-  // A bulletproof JSON extractor that safely counts brackets and ignores strings
   extractJSON(str, startChar, endChar, startIndex) {
     let depth = 0;
     let inString = false;
@@ -61,39 +60,41 @@ export class AgentOrchestrator {
 
   parseAction(content, mcpTools) {
     try {
-      // 1. Catch the OpenAI tool call array leak (this is what caused the bug)
-      const oaiIndex = content.indexOf('[{"id"');
-      if (oaiIndex !== -1) {
-        const jsonStr = this.extractJSON(content, '[', ']', oaiIndex);
+      const arrayIndex = content.indexOf('[{');
+      if (arrayIndex !== -1) {
+        const jsonStr = this.extractJSON(content, '[', ']', arrayIndex);
         if (jsonStr) {
           const parsed = JSON.parse(jsonStr);
-          const call = parsed[0];
-          const funcName = call.function?.name || call.name; 
-          const rawArgs = call.function?.arguments || call.arguments;
-          
-          // OpenAI returns arguments as a stringified JSON. We must parse it again.
-          const args = typeof rawArgs === 'string' ? JSON.parse(rawArgs) : rawArgs;
-          
-          // Dynamically map server
-          let server = 'local';
-          const isLocal = this.localTools.getToolDefinitions().some(t => t.name === funcName);
-          if (!isLocal && mcpTools) {
-            const mcpDef = mcpTools.find(t => t.name === funcName);
-            if (mcpDef) server = mcpDef.server;
+          const call = Array.isArray(parsed) ? parsed[0] : parsed;
+          if (call && (call.name || call.tool || call.function)) {
+            const funcName = call.tool || call.name || call.function?.name;
+            const rawArgs = call.args || call.arguments || call.function?.arguments;
+            const args = typeof rawArgs === 'string' ? JSON.parse(rawArgs) : rawArgs;
+            
+            let server = 'local';
+            const isLocal = this.localTools.getToolDefinitions().some(t => t.name === funcName);
+            if (!isLocal && mcpTools) {
+              const mcpDef = mcpTools.find(t => t.name === funcName);
+              if (mcpDef) server = mcpDef.server;
+            }
+            return { tool: funcName, server, args, raw: jsonStr };
           }
-          return { tool: funcName, server, args };
         }
       }
 
-      // 2. Catch custom format fallback
-      const customIndex = content.indexOf('{"tool"');
-      if (customIndex !== -1) {
-        const jsonStr = this.extractJSON(content, '{', '}', customIndex);
-        if (jsonStr) return JSON.parse(jsonStr);
+      const objectIndex = content.indexOf('{"');
+      if (objectIndex !== -1) {
+        const jsonStr = this.extractJSON(content, '{', '}', objectIndex);
+        if (jsonStr) {
+          const parsed = JSON.parse(jsonStr);
+          if (parsed.tool || parsed.name) {
+            const funcName = parsed.tool || parsed.name;
+            const args = parsed.args || parsed.arguments;
+            return { tool: funcName, server: parsed.server || 'local', args, raw: jsonStr };
+          }
+        }
       }
-    } catch (e) {
-      // Silently fail and return null so the loop continues instead of crashing
-    }
+    } catch (e) {}
     return null;
   }
 
@@ -115,29 +116,19 @@ export class AgentOrchestrator {
       const content = response.data.choices[0].message.content;
       this.history.push({ role: 'assistant', content });
 
-      // Clean display logic: Use our extractor to perfectly strip the JSON payloads from the terminal UI
+      const action = this.parseAction(content, mcpTools);
       let reasoning = content;
       
-      const oaiIndex = reasoning.indexOf('[{"id"');
-      if (oaiIndex !== -1) {
-        const jsonStr = this.extractJSON(reasoning, '[', ']', oaiIndex);
-        if (jsonStr) reasoning = reasoning.replace(jsonStr, '');
+      if (action && action.raw) {
+        reasoning = reasoning.replace(action.raw, '');
       }
-
-      const customIndex = reasoning.indexOf('{"tool"');
-      if (customIndex !== -1) {
-        const jsonStr = this.extractJSON(reasoning, '{', '}', customIndex);
-        if (jsonStr) reasoning = reasoning.replace(jsonStr, '');
-      }
-
+      
       reasoning = reasoning.replace(/```json[\s\S]*?```/g, '').trim();
       
       if (reasoning) {
         process.stdout.write(`\n${this.colors.pollina('🐝 [Pollina]:')} ${chalk.white(reasoning)}\n`);
       }
 
-      const action = this.parseAction(content, mcpTools);
-      
       if (!action) break;
 
       if (action.tool === 'consult_architect') {
@@ -202,9 +193,12 @@ export class AgentOrchestrator {
     const choice = res.data.choices[0].message.content;
     if (choice.includes('search')) {
       try {
-        const query = JSON.parse(choice.match(/\{.*\}/)[0]).search;
-        console.log(chalk.cyan(`🔍 [Research]: Verifying "${query}"...`));
-        return await this.mcp.callMcp('google-search', 'search', { query });
+        const jsonMatch = choice.match(/\{.*\}/);
+        if (jsonMatch) {
+            const query = JSON.parse(jsonMatch[0]).search;
+            console.log(chalk.cyan(`🔍 [Research]: Verifying "${query}"...`));
+            return await this.mcp.callMcp('google-search', 'search', { query });
+        }
       } catch (e) { return "Search suggested but parsing failed."; }
     }
     return "Verified.";
@@ -273,3 +267,4 @@ ${JSON.stringify(definitions)}`;
     return res.data.choices[0].message.content;
   }
 }
+
