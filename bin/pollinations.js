@@ -14,13 +14,50 @@ import { historyAction, replayAction } from '../src/commands/history.js';
 import { templateSave, templateRun } from '../src/commands/template.js';
 import { config } from '../src/lib/config-store.js';
 import chalk from 'chalk';
+import figlet from 'figlet';
+import gradient from 'gradient-string';
+import inquirer from 'inquirer';
+
+const beeGradient = gradient(['#facc15', '#eab308', '#22c55e', '#3b82f6']); // Yellow to Green to Blue
+const highlight = chalk.bold.yellow
 
 program.name('pollinations').version('1.2.0');
 
-program.command('login <key>')
-  .action((key) => {
-    config.set('apiKey', key);
-    console.log(chalk.green('✔ API Key stored in ~/.pollinations/config.json'));
+program.command('login')
+  .description('Authenticate and initialize the Pollinations dashboard')
+  .action(async () => {
+    console.clear();
+
+    
+    console.log(beeGradient(figlet.textSync('POLLINATIONS', { font: 'ANSI Shadow' })));
+    console.log(chalk.dim(`  v1.2.0 | Created by: blueplaysgames3921 | Infrastructure: pollinations.ai\n`));
+
+    
+    console.log(chalk.cyan('┌── Tips for the Garden ──────────────────────────────────────────┐'));
+    console.log(`│ ${highlight('• Text:')} Use ${chalk.green('--stream')} for real-time AI responses.          │`);
+    console.log(`│ ${highlight('• Pixels:')} Generate images with ${chalk.green('pollinations image "prompt"')}  │`);
+    console.log(`│ ${highlight('• Motion:')} Try the ${chalk.green('video')} command for cinematic loops.       │`);
+    console.log(`│ ${highlight('• Swarm:')} Create ${chalk.green('AGENTS.md')} to give Pollina project context.   │`);
+    console.log(`│ ${highlight('• Pipes:')} Use ${chalk.dim('cat logs.txt | pollinations text')} to summarize.  │`);
+    console.log(chalk.cyan('└─────────────────────────────────────────────────────────────────┘\n'));
+
+    
+    const { key } = await inquirer.prompt([
+      {
+        type: 'password',
+        name: 'key',
+        message: 'Enter your Pollinations API Key:',
+        mask: '🐝'
+      }
+    ]);
+
+    if (key && key.length > 10) {
+      config.set('apiKey', key);
+      console.log(`\n${chalk.green('✔')} ${chalk.bold('Welcome to the Swarm.')} Your key is securely stored.`);
+      console.log(chalk.dim('Run "pollinations --help" to see all available tools.\n'));
+    } else {
+      console.log(`\n${chalk.red('✘')} Invalid key. Garden access denied.`);
+    }
   });
 
 program.command('text [prompt]')
