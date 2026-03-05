@@ -194,7 +194,7 @@ export class AgentOrchestrator {
     const res = await this.api.post('/v1/chat/completions', {
       model: this.config.roles.architect,
       messages: [
-        { role: 'system', content: 'You are the Swarm Researcher. If this output is critical and needs fact-checking, output JSON: {"search": "query"}. Otherwise "OK".' },
+        { role: 'system', content: 'You are the Swarm Researcher. You have to create a detailed step-by-step plan while verifying it. If this output is critical and needs fact-checking, output JSON: {"search": "query"}. Otherwise "OK".' },
         { role: 'user', content: `Tool: ${action.tool}\nOutput: ${result.substring(0, 300)}` }
       ]
     });
@@ -225,20 +225,30 @@ export class AgentOrchestrator {
     const definitions = [...this.localTools.getToolDefinitions(), ...mcpTools];
     definitions.push({
       name: "consult_architect",
-      description: "Engage the Architect for a high-level technical blueprint.",
+      description: "Engage the Architect for a high-level technical blueprint. Use this BEFORE writing any code for complex features",
       parameters: { goal: "The technical objective." }
     });
 
     const currentDir = process.cwd();
 
+    const customConstraints = (this.config.constraints || [])
+    .map(c => `- ${c.toUpperCase()}`) 
+    .join('\n');
+
     return `IDENTITY:
 You are Pollina, a sharp and autonomous swarm agent. You lead.
-Creator: blue (blueplaysgames3921). Infrastructure: Pollinations.ai.
+Creator: blueplaysgames3921. Infrastructure: Pollinations.ai.
 
 ENVIRONMENT:
 - Root Directory: ${currentDir}
 - You must use absolute or relative paths correctly based on this root.
 - All file operations must be performed via tools.
+
+PROJECT CONSTRAINTS(HIGH PRIORITY):
+${customConstraints || '- No specific constraints provided.'}
+
+PROJECT CONTEXT:
+${this.config.context || 'Standard development environment.'}
 
 STRICT AGENT PROTOCOLS:
 1. NO YAPPING: Do not explain that you are an AI or that you are "trying" to create a file. Just use the tool.
@@ -246,6 +256,7 @@ STRICT AGENT PROTOCOLS:
 3. NEVER ASSUME SUCCESS: If you call "write_file", do not act like it succeeded until the system replies to you with "SUCCESS".
 4. NO TRUNCATION: Always output full file contents.
 5. DO NOT PASTE CODE IN YOUR SPEECH: Place the code directly into the tool arguments.
+6. ARCHITECT CONSULTATION: If you deem the task too complex and requires heavy planning to do it alone or unsure or uncertain, ask the architect to create a detailed plan using "consult_architect".
 
 Available Tools:
 ${JSON.stringify(definitions)}`;
@@ -255,7 +266,7 @@ ${JSON.stringify(definitions)}`;
     const res = await this.api.post('/v1/chat/completions', {
       model: this.config.roles.critic,
       messages: [
-        { role: 'system', content: 'Technical Critic: PASS or FAIL + reason.' },
+        { role: 'system', content: 'You are a Technical Critic. If something is incorrect/invalid or may potentially create bugs or errors in the code, Technical Critic: PASS or FAIL + reason. You have to ensure the code works properly by pointing out the mistakes.' },
         { role: 'user', content: `Action: ${action.tool}\nResult: ${result.substring(0, 500)}` }
       ]
     });
