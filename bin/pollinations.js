@@ -21,7 +21,7 @@ import inquirer from 'inquirer';
 const beeGradient = gradient(['#facc15', '#eab308', '#22c55e', '#3b82f6']);
 const highlight = chalk.bold.yellow
 
-program.name('pollinations').version('1.2.0');
+program.name('pollinations').version('1.2.1');
 
 program.command('login')
   .description('Authenticate and initialize the Pollinations dashboard')
