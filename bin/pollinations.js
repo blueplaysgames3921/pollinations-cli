@@ -30,7 +30,7 @@ program.command('login')
 
     
     console.log(beeGradient(figlet.textSync('> POLLINATIONS', { font: 'ANSI Shadow' })));
-    console.log(chalk.dim(`  v1.2.0 | Created by: blueplaysgames3921 | Infrastructure: pollinations.ai\n`));
+    console.log(chalk.dim(`  v1.2.1 | Created by: blueplaysgames3921 | Infrastructure: pollinations.ai\n`));
 
     
     console.log(chalk.cyan('┌── Tips for the Garden ──────────────────────────────────────────┐'));
