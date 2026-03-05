@@ -2,6 +2,20 @@
 
 All notable changes to the Pollinations CLI will be documented in this file.
 
+## [1.2.0] - 2026-03-05
+### Added
+- **Swarm Agent Orchestrator**: Added `pollinations assist` to launch **Pollina**, an autonomous agent capable of using local and remote tools.
+- **AGENTS.md Support**: Implemented local project configuration via YAML-in-Markdown. Features recursive directory lookup (stopping at home) to automatically load project-specific constraints and context.
+- **Model Context Protocol (MCP)**: Integrated MCP for external tool support, allowing Pollina to connect to specialized servers (e.g., Google Search).
+- **Multi-Agent Logic**: Added internal roles for **Architect** (planning), **Coder** (execution), **Critic** (validation) and **Artist** (asset generation).
+- **Auto-Initialization**: CLI now detects missing configurations in non-home directories and offers to generate a standard `AGENTS.md` template.
+
+### Fixed
+- **Terminal UI**: Fixed JSON payload "leakage" in the terminal using a bulletproof bracket-counting extractor for cleaner agent reasoning displays.
+- **Environment Awareness**: Improved path resolution to ensure the agent respects absolute/relative paths in restricted environments like Termux.
+
+---
+
 ## [1.1.1] - 2026-03-03
 ### Fixed
 - **Chat API Authorization**: Fixed a bug where `chat` bypassed the global API configuration. It now correctly uses `getApi()` for authorized requests to `/v1/chat/completions`.
