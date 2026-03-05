@@ -18,7 +18,7 @@ import figlet from 'figlet';
 import gradient from 'gradient-string';
 import inquirer from 'inquirer';
 
-const beeGradient = gradient(['#facc15', '#eab308', '#22c55e', '#3b82f6']); // Yellow to Green to Blue
+const beeGradient = gradient(['#facc15', '#eab308', '#22c55e', '#3b82f6']);
 const highlight = chalk.bold.yellow
 
 program.name('pollinations').version('1.2.0');
@@ -29,7 +29,7 @@ program.command('login')
     console.clear();
 
     
-    console.log(beeGradient(figlet.textSync('POLLINATIONS', { font: 'ANSI Shadow' })));
+    console.log(beeGradient(figlet.textSync('> POLLINATIONS', { font: 'ANSI Shadow' })));
     console.log(chalk.dim(`  v1.2.0 | Created by: blueplaysgames3921 | Infrastructure: pollinations.ai\n`));
 
     
