@@ -16,6 +16,14 @@ export class ToolManager {
         await fs.writeFile(fullPath, content);
         return `Successfully wrote to ${fullPath}`; // Changed to return full path to enforce strict verification
       },
+            move_file: async ({ oldPath, newPath }) => {
+        const sourcePath = path.resolve(process.cwd(), oldPath);
+        const destPath = path.resolve(process.cwd(), newPath);
+        await fs.ensureDir(path.dirname(destPath));
+        await fs.move(sourcePath, destPath, { overwrite: true });
+        return `Successfully moved/renamed ${oldPath} to ${newPath}`;
+      },
+
       list_files: async ({ dirPath = '.' }) => {
         const fullPath = path.resolve(process.cwd(), dirPath);
         const files = await fs.readdir(fullPath);
