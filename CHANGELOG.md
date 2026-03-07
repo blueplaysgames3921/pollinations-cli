@@ -2,6 +2,19 @@
 
 All notable changes to the Pollinations CLI will be documented in this file.
 
+## [1.2.2] - 2026-03-07
+### Added
+- **BYOP (Bring Your Own Pollen)**: Integrated a new authentication flow allowing users to log in via `enter.pollinations.ai` to use their own pollen.
+- **Hybrid Login**: Added a branching UI to the `login` command, offering a choice between secure Web Auth (BYOP) and manual API key entry.
+- **Enhanced Browser Integration**: Added `open` dependency to automatically launch the Pollinations authorization dashboard from the terminal.
+- **File System Tooling**: Added `move_file` capability to the autonomous agent (**Pollina**), allowing for advanced project reorganization and file renaming with automatic directory creation.
+
+### Changed
+- **Modular Architecture**: Refactored the authentication logic out of the main executable into `src/commands/auth.js` for better maintainability.
+- **UI Refresh**: Updated the login sequence with themed gradients and a streamlined "Tips for the Garden" interface.
+
+---
+
 ## [1.2.1] - 2026-03-05
 ### Fixed
 - **Image Path Context**: Fixed a bug where generated images were being dropped in the CLI root instead of the project subfolders. The `generate_image` tool now forces absolute path resolution relative to the current working directory.
