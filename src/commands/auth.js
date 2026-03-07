@@ -7,7 +7,7 @@ import http from 'http';
 import { config } from '../lib/config-store.js';
 
 const beeGradient = gradient(['#facc15', '#eab308', '#22c55e', '#3b82f6']);
-const hiveTheme = gradient(['#adff2f', '#fbbf24', '#facc15']);
+
 const grassTheme = gradient(['#22c55e', '#16a34a', '#15803d']);
 const highlight = chalk.bold.yellow;
 
@@ -16,14 +16,6 @@ export async function authAction() {
 
   console.log(beeGradient(figlet.textSync('POLLINATIONS', { font: 'ANSI Shadow' })));
   
-  console.log(hiveTheme(`
-     _  _          
-   _/ \\/ \\_        
-  /   \\_   \\       
-  \\_ _/ \\_ _/      
-    / \\_/ \\        
-    \\_/ \\_/        
-  `));
 
   console.log(chalk.white('  VERSION: ') + chalk.bold.yellow('v1.2.2'));
   console.log(chalk.white('  CREATOR: ') + chalk.bold.cyan('blueplaysgames3921'));
@@ -38,6 +30,11 @@ export async function authAction() {
   console.log(`│ ${highlight('• Pipes:')} Use ${chalk.dim('cat logs.txt | pollinations text')} to summarize.  │`);
   console.log(chalk.cyan('└─────────────────────────────────────────────────────────────────┘\n'));
 
+  console.log(chalk.yellow('╔════════════════════════════════════════════════════════════════╗'));
+  console.log(chalk.yellow('║') + chalk.white('  [1] Login via Pollinations Gateway (input: byop) [RECOMMENDED]                  ') + chalk.yellow('║'));
+  console.log(chalk.yellow('╠════════════════════════════════════════════════════════════════╣'));
+  console.log(chalk.yellow('║') + chalk.white('  [2] Enter API Key Manually (input: manual)                                ') + chalk.yellow('║'));
+  console.log(chalk.yellow('╚════════════════════════════════════════════════════════════════╝\n'));
   const { method } = await inquirer.prompt([
     {
       type: 'list',
