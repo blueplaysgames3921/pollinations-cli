@@ -27,7 +27,7 @@ export async function authAction() {
 
   console.log(chalk.white('  VERSION: ') + chalk.bold.yellow('v1.2.2'));
   console.log(chalk.white('  CREATOR: ') + chalk.bold.cyan('blueplaysgames3921'));
-  console.log(chalk.white('  INFRA:   ') + chalk.bold.green('pollinations.ai'));
+  console.log(chalk.white('  INFRASTRUCTURE:   ') + chalk.bold.green('pollinations.ai'));
   console.log('\n' + grassTheme('☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘') + '\n');
 
   console.log(chalk.cyan('┌── Tips for the Garden ──────────────────────────────────────────┐'));
