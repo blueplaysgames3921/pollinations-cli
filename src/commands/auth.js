@@ -3,6 +3,7 @@ import figlet from 'figlet';
 import gradient from 'gradient-string';
 import inquirer from 'inquirer';
 import open from 'open';
+import http from 'http';
 import { config } from '../lib/config-store.js';
 
 const beeGradient = gradient(['#facc15', '#eab308', '#22c55e', '#3b82f6']);
@@ -28,35 +29,45 @@ export async function authAction() {
     {
       type: 'list',
       name: 'method',
-      message: 'Choose your authentication method:',
+      message: 'Select Authentication Method:',
       choices: [
-        { name: '1. Login with Pollinations (BYOP - Recommended)', value: 'byop' },
-        { name: '2. Enter API Key Manually', value: 'manual' }
+        { 
+          name: `${chalk.yellow('Option 1:')} Login via Browser ${chalk.cyan('(BYOP - Recommended)')}`, 
+          value: 'byop' 
+        },
+        { 
+          name: `${chalk.yellow('Option 2:')} Manual API Key Entry`, 
+          value: 'manual' 
+        }
       ]
     }
   ]);
 
   if (method === 'byop') {
     const authUrl = new URL('https://enter.pollinations.ai/authorize');
-    authUrl.searchParams.set('redirect_url', 'https://pollinations-cli-web.vercel.app');
-    authUrl.searchParams.set('app_key', 'pk_dI8YPBNjXO3BddSA');
+    authUrl.searchParams.set('redirect_url', 'https://pollinations-cli-web.vercel.app/auth');
+    authUrl.searchParams.set('app_key', 'pk_y3LE9V9R0kOBlPBp');
 
-    console.log(`\n${chalk.blue('ℹ')} Opening your browser for secure authentication...`);
-    console.log(chalk.dim(`URL: ${authUrl.toString()}\n`));
-    
+    // Start Local Listener
+    const server = http.createServer((req, res) => {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const key = url.searchParams.get('key');
+
+      if (key) {
+        saveKey(key);
+        res.end('Authenticated. You can close this window.');
+        server.close(); // Kill server after success
+        process.exit(0); // Optional: close process if this was a standalone login call
+      }
+    });
+
+    server.listen(9999);
+
+    console.log(`\n${chalk.blue('ℹ')} Opening the Swarm Gateway in your browser...`);
     await open(authUrl.toString());
 
-    console.log(chalk.yellow('⚠  Once you have your key from the website, come back here.'));
-    
-    const { key } = await inquirer.prompt([
-      {
-        type: 'password',
-        name: 'key',
-        message: 'Paste the API Key from the browser:',
-        mask: '🐝'
-      }
-    ]);
-    saveKey(key);
+    console.log(chalk.yellow('⌛ Waiting for browser authorization...'));
+    console.log(chalk.dim('(If it fails, press Ctrl+C and use Manual Entry)\n'));
 
   } else {
     const { key } = await inquirer.prompt([
