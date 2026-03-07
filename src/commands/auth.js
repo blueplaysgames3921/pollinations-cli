@@ -13,18 +13,17 @@ const highlight = chalk.bold.yellow;
 export async function authAction() {
   console.clear();
 
-  // Header UI with ASCII Bees
-  console.log(beeGradient(figlet.textSync('> POLLINATIONS', { font: 'ANSI Shadow' })));
+  console.log(beeGradient(figlet.textSync('POLLINATIONS', { font: 'ANSI Shadow' })));
+  
   console.log(hiveTheme(`
-          _  _
-        _/ \\/ \\_
-       /   \\_   \\    Welcome to the Hive
-       \\_ _/ \\_ _/    ${chalk.white('v1.2.2')}
-         / \\_/ \\
-         \\_/ \\_/     ${chalk.dim('Created by: blueplaysgames3921')}
+   _  _     
+ _/ \\/ \\_   ${chalk.white.bold('v1.2.2')}
+/   \\_   \\  ${chalk.dim('Created by: blueplaysgames3921')}
+\\_ _/ \\_ _/  ${chalk.bold('WELCOME TO THE HIVE')}
+  / \\_/ \\
+  \\_/ \\_/
   `));
 
-  // Tips Box
   console.log(chalk.cyan('┌── Tips for the Garden ──────────────────────────────────────────┐'));
   console.log(`│ ${highlight('• Text:')} Use ${chalk.green('--stream')} for real-time AI responses.          │`);
   console.log(`│ ${highlight('• Pixels:')} Generate images with ${chalk.green('pollinations image "prompt"')}  │`);
@@ -37,10 +36,10 @@ export async function authAction() {
     {
       type: 'list',
       name: 'method',
-      message: chalk.bold('Select Authentication Method:'),
+      message: chalk.bold('SELECT AUTHENTICATION METHOD:'),
       choices: [
         { 
-          name: `${chalk.yellow('Option 1 [BYOP]:')} Login via Pollinations Gateway ${chalk.cyan('(Recommended)')}`, 
+          name: `${chalk.yellow('Option 1 [BYOP]:')} Login via Pollinations Gateway`, 
           value: 'byop' 
         },
         { 
@@ -51,7 +50,6 @@ export async function authAction() {
     }
   ]);
 
-  // VALIDATION: Strict check for the method
   if (method === 'byop') {
     const authUrl = new URL('https://enter.pollinations.ai/authorize');
     authUrl.searchParams.set('redirect_url', 'https://pollinations-cli-web.vercel.app/auth');
@@ -77,13 +75,12 @@ export async function authAction() {
 
     server.listen(9999);
 
-    console.log(`\n${chalk.blue('ℹ')} ${chalk.bold('METHOD [BYOP]:')} Redirecting to Pollinations Browser Auth...`);
-    console.log(chalk.dim(`Gateway: ${authUrl.toString()}\n`));
+    console.log(`\n${chalk.blue('ℹ')} ${chalk.bold('METHOD [BYOP]:')} Redirecting to Browser...`);
     
     await open(authUrl.toString());
 
     console.log(chalk.yellow('⌛ Waiting for the Hive handshake...'));
-    console.log(chalk.dim('Press Ctrl+C to abort and use Manual Entry if the browser fails.\n'));
+    console.log(chalk.dim('Press Ctrl+C to abort and use Manual Entry.\n'));
 
   } else if (method === 'manual') {
     console.log(`\n${chalk.blue('ℹ')} ${chalk.bold('METHOD [MANUAL]:')} Direct Key Entry`);
@@ -94,26 +91,24 @@ export async function authAction() {
         message: 'Paste your Pollinations API Key:',
         mask: '🐝',
         validate: (input) => {
-            if (input.length < 10) return 'Invalid Key: Too short.';
+            if (input.length < 10) return 'Key too short.';
             return true;
         }
       }
     ]);
     saveKey(key);
   } else {
-    // Catch-all for invalid logic
     console.log(`\n${chalk.red('✘')} ${chalk.bold('ERROR:')} NOT A VALID AUTHENTICATION METHOD.`);
     process.exit(1);
   }
 }
 
 function saveKey(key) {
-  if (key && key.startsWith('sk-') || key.length > 10) {
+  if (key && key.length > 10) {
     config.set('apiKey', key);
     console.log(`\n${chalk.green('✔')} ${chalk.bold('Welcome to the Swarm.')} Your key is securely stored.`);
-    console.log(chalk.dim('The terminal is now synchronized with your Pollen balance.\n'));
-    console.log(chalk.cyan('Run "pollinations --help" to begin.\n'));
+    console.log(chalk.dim('Terminal synchronized.\n'));
   } else {
     console.log(`\n${chalk.red('✘')} Invalid Key. Handshake rejected.`);
   }
-}
+  }
