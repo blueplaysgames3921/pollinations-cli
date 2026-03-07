@@ -10,7 +10,7 @@ import { videoAction } from '../src/commands/video.js';
 import { audioAction } from '../src/commands/audio.js';
 import { galleryAction } from '../src/utils/history.js';
 import { chatAction } from '../src/commands/chat.js';
-import { authAction } from '../src/commands/auth.js
+import { authAction } from '../src/commands/auth.js;
 import { historyAction, replayAction } from '../src/commands/history.js';
 import { templateSave, templateRun } from '../src/commands/template.js';
 import { config } from '../src/lib/config-store.js';
