@@ -8,6 +8,7 @@ import { config } from '../lib/config-store.js';
 
 const beeGradient = gradient(['#facc15', '#eab308', '#22c55e', '#3b82f6']);
 const hiveTheme = gradient(['#adff2f', '#fbbf24', '#facc15']);
+const grassTheme = gradient(['#22c55e', '#16a34a', '#15803d']);
 const highlight = chalk.bold.yellow;
 
 export async function authAction() {
@@ -16,13 +17,18 @@ export async function authAction() {
   console.log(beeGradient(figlet.textSync('POLLINATIONS', { font: 'ANSI Shadow' })));
   
   console.log(hiveTheme(`
-   _  _     
- _/ \\/ \\_   ${chalk.white.bold('v1.2.2')}
-/   \\_   \\  ${chalk.dim('Created by: blueplaysgames3921')}
-\\_ _/ \\_ _/  ${chalk.bold('WELCOME TO THE HIVE')}
-  / \\_/ \\
-  \\_/ \\_/
+     _  _          
+   _/ \\/ \\_        
+  /   \\_   \\       
+  \\_ _/ \\_ _/      
+    / \\_/ \\        
+    \\_/ \\_/        
   `));
+
+  console.log(chalk.white('  VERSION: ') + chalk.bold.yellow('v1.2.2'));
+  console.log(chalk.white('  CREATOR: ') + chalk.bold.cyan('blueplaysgames3921'));
+  console.log(chalk.white('  INFRA:   ') + chalk.bold.green('pollinations.ai'));
+  console.log('\n' + grassTheme('☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘') + '\n');
 
   console.log(chalk.cyan('┌── Tips for the Garden ──────────────────────────────────────────┐'));
   console.log(`│ ${highlight('• Text:')} Use ${chalk.green('--stream')} for real-time AI responses.          │`);
@@ -36,14 +42,14 @@ export async function authAction() {
     {
       type: 'list',
       name: 'method',
-      message: chalk.bold('SELECT AUTHENTICATION METHOD:'),
+      message: chalk.bold.white('SELECT AUTHENTICATION METHOD:'),
       choices: [
         { 
-          name: `${chalk.yellow('Option 1 [BYOP]:')} Login via Pollinations Gateway`, 
+          name: `🐝 ${chalk.yellow('Option 1 [BYOP]:')} Login via Pollinations Gateway`, 
           value: 'byop' 
         },
         { 
-          name: `${chalk.yellow('Option 2 [MANUAL]:')} Enter API Key Manually`, 
+          name: `🔑 ${chalk.yellow('Option 2 [MANUAL]:')} Enter API Key Manually`, 
           value: 'manual' 
         }
       ]
@@ -111,4 +117,4 @@ function saveKey(key) {
   } else {
     console.log(`\n${chalk.red('✘')} Invalid Key. Handshake rejected.`);
   }
-  }
+}
