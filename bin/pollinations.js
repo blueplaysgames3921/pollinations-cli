@@ -15,12 +15,6 @@ import { historyAction, replayAction } from '../src/commands/history.js';
 import { templateSave, templateRun } from '../src/commands/template.js';
 import { config } from '../src/lib/config-store.js';
 import chalk from 'chalk';
-import figlet from 'figlet';
-import gradient from 'gradient-string';
-import inquirer from 'inquirer';
-
-const beeGradient = gradient(['#facc15', '#eab308', '#22c55e', '#3b82f6']);
-const highlight = chalk.bold.yellow
 
 program.name('pollinations').version('1.2.2');
 
