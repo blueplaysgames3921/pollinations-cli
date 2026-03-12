@@ -1,7 +1,11 @@
 {
   "name": "@bluegaminggm/pollinations-cli",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "type": "module",
+    "repository": {
+    "type": "git",
+    "url": "https://github.com/blueplaysgames3921/pollinations-cli.git"
+  },
   "author": "blueplaysgames3921",
   "license": "MIT",
   "bin": {
