@@ -2,6 +2,13 @@
 
 All notable changes to the Pollinations CLI will be documented in this file.
 
+## [1.2.4] - 2026-03-12
+
+### Added
+- **Repository Metadata**: Added the official GitHub repository link to `package.json` to enable the repository sidebar and links on the npm registry.
+
+---
+
 ## [1.2.3] - 2026-03-12
 
 ### Added
