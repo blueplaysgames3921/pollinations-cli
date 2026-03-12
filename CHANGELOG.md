@@ -2,6 +2,19 @@
 
 All notable changes to the Pollinations CLI will be documented in this file.
 
+## [1.2.3] - 2026-03-12
+
+### Added
+- **BYOP Auto-Login Bridge** (`/auth/cli`): When selecting BYOP login, the CLI now opens a bridge page on the web app first. If the user is already logged in on `pollinations-cli-web.vercel.app`, their Pollen key is grabbed from the browser and injected into the local CLI listener (port 9999) instantly — no SSO redirect or sign-in flow required. The browser tab closes itself automatically on success.
+- If no session is found in the browser, the bridge silently forwards to the Pollinations SSO (`enter.pollinations.ai/authorize`) as before.
+
+### Changed
+- **`src/commands/auth.js`**: BYOP flow now opens `https://pollinations-cli-web.vercel.app/auth/cli` instead of the authorize URL directly. The port 9999 listener and key saving logic are unchanged.
+- **Navbar (web)**: "Enter Hive" and mobile "Login" buttons now correctly point to `enter.pollinations.ai/authorize` with the proper `app_key` and `redirect_url` params for BYOP SSO registration.
+- Terminal output for BYOP now clarifies both paths ("already logged in" vs "complete sign-in in browser").
+
+---
+
 ## [1.2.2] - 2026-03-07
 ### Added
 - **BYOP (Bring Your Own Pollen)**: Integrated a new authentication flow allowing users to log in via `enter.pollinations.ai` to use their own pollen.
