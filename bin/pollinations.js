@@ -16,7 +16,7 @@ import { templateSave, templateRun } from '../src/commands/template.js';
 import { config } from '../src/lib/config-store.js';
 import chalk from 'chalk';
 
-program.name('pollinations').version('1.2.2');
+program.name('pollinations').version('1.2.3');
 
 program.command('login')
   .description('Authenticate and initialize the Pollinations dashboard')
