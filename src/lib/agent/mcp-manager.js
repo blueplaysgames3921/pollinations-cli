@@ -10,7 +10,7 @@ export class MCPManager {
     try {
       const transport = new StdioClientTransport({ command, args });
       const client = new Client(
-        { name: "pollina-agent", version: "1.2.2" },
+        { name: "pollina-agent", version: "1.2.3" },
         { capabilities: {} }
       );
       await client.connect(transport);
