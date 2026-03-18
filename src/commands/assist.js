@@ -9,7 +9,7 @@ import { saveSession, updateSession, makeTitle } from '../lib/sessions.js';
 
 async function findAgentFile(startDir) {
   let current = startDir;
-  const home = os.homedir();
+  const home  = os.homedir();
   while (current !== path.parse(current).root) {
     const candidate = path.join(current, 'AGENTS.md');
     if (await fs.pathExists(candidate)) return candidate;
@@ -20,15 +20,15 @@ async function findAgentFile(startDir) {
 }
 
 const DEFAULT_CONFIG = {
-  roles: { architect: 'mistral', coder: 'qwen-coder', critic: 'openai', artist: 'flux' },
-  researcher: { model: 'gemini-search', enabled: true },
+  roles:       { architect: 'mistral', coder: 'qwen-coder', critic: 'openai', artist: 'flux' },
+  researcher:  { model: 'gemini-search', enabled: true },
   constraints: [
     'Always use absolute paths for file operations',
     'Verify file existence before reading or editing',
     'Never delete the .git folder',
     'Never hardcode API keys or secrets'
   ],
-  context: 'General purpose development environment',
+  context:     'General purpose development environment',
   mcp_servers: []
 };
 
@@ -59,7 +59,7 @@ mcp_servers:
     args:    ["-y", "@pollinations_ai/mcp"]
 
   # GitHub — create PRs, commit code, search issues
-  # Uncomment and export GITHUB_TOKEN before running
+  # Set GITHUB_TOKEN in your environment before running
   # - name:    "github"
   #   command: "npx"
   #   args:    ["-y", "@modelcontextprotocol/server-github"]
@@ -73,18 +73,13 @@ mcp_servers:
   #   env:
   #     POSTGRES_CONNECTION_STRING: "\${POSTGRES_CONNECTION_STRING}"
 
-  # Slack — send messages, read channels
+  # Slack — send messages and read channels
   # - name:    "slack"
   #   command: "npx"
   #   args:    ["-y", "@modelcontextprotocol/server-slack"]
   #   env:
   #     SLACK_BOT_TOKEN: "\${SLACK_BOT_TOKEN}"
   #     SLACK_TEAM_ID:   "\${SLACK_TEAM_ID}"
-
-  # Filesystem MCP — extended filesystem access
-  # - name:    "filesystem"
-  #   command: "npx"
-  #   args:    ["-y", "@modelcontextprotocol/server-filesystem", "."]
 
 context: "This project is located at ${dir}"
 \`\`\`
@@ -93,11 +88,11 @@ context: "This project is located at ${dir}"
 
 async function loadConfig(dir) {
   const agentPath = await findAgentFile(dir);
-  let config = { ...DEFAULT_CONFIG, context: `Project at: ${dir}` };
+  let config      = { ...DEFAULT_CONFIG, context: `Project at: ${dir}` };
 
   if (!agentPath) return { config, agentPath: null };
 
-  const raw = await fs.readFile(agentPath, 'utf8');
+  const raw   = await fs.readFile(agentPath, 'utf8');
   const match = raw.match(/```yaml([\s\S]*?)```/);
   if (!match) return { config, agentPath };
 
@@ -106,8 +101,8 @@ async function loadConfig(dir) {
     config = {
       ...config,
       ...parsed,
-      roles:       { ...DEFAULT_CONFIG.roles,       ...(parsed.roles       || {}) },
-      researcher:  { ...DEFAULT_CONFIG.researcher,  ...(parsed.researcher  || {}) },
+      roles:       { ...DEFAULT_CONFIG.roles,      ...(parsed.roles       || {}) },
+      researcher:  { ...DEFAULT_CONFIG.researcher, ...(parsed.researcher  || {}) },
       constraints: parsed.constraints || DEFAULT_CONFIG.constraints,
       mcp_servers: parsed.mcp_servers || DEFAULT_CONFIG.mcp_servers
     };
@@ -116,6 +111,21 @@ async function loadConfig(dir) {
   }
 
   return { config, agentPath };
+}
+
+function displaySessionRecap(history) {
+  if (!history?.length) return;
+
+  const userMessages = history.filter(m => m.role === 'user');
+  const total        = history.length;
+  const lastUser     = userMessages[userMessages.length - 1]?.content || '';
+  const preview      = lastUser.length > 80 ? lastUser.slice(0, 80) + '…' : lastUser;
+
+  console.log(chalk.dim('  ' + '─'.repeat(54)));
+  console.log(chalk.dim(`  Session history: ${total} messages, ${userMessages.length} tasks`));
+  if (preview) console.log(chalk.dim(`  Last task: "${preview}"`));
+  console.log(chalk.dim('  ' + '─'.repeat(54)));
+  console.log('');
 }
 
 function promptSave(rl) {
@@ -150,8 +160,8 @@ export async function assistAction(resumedSession = null) {
     const rc = resumedSession.config;
     Object.assign(config, {
       ...rc,
-      roles:       { ...config.roles,       ...(rc.roles       || {}) },
-      researcher:  { ...config.researcher,  ...(rc.researcher  || {}) },
+      roles:       { ...config.roles,      ...(rc.roles       || {}) },
+      researcher:  { ...config.researcher, ...(rc.researcher  || {}) },
       constraints: rc.constraints || config.constraints,
       mcp_servers: rc.mcp_servers || config.mcp_servers
     });
@@ -182,12 +192,18 @@ export async function assistAction(resumedSession = null) {
 
   console.log(chalk.bold.yellow('  🐝 POLLINA READY'));
   if (agentPath) console.log(chalk.dim(`  Config: ${agentPath}`));
-  if (resumedSession) console.log(chalk.dim(`  Resumed session #${resumedSession.id}: ${resumedSession.title}`));
-  console.log(chalk.dim(`  Directory: ${targetDir}\n`));
+  console.log(chalk.dim(`  Directory: ${targetDir}`));
+
+  if (resumedSession) {
+    console.log(chalk.dim(`  Resumed session #${resumedSession.id} — ${resumedSession.title}`));
+    displaySessionRecap(resumedSession.history);
+  } else {
+    console.log('');
+  }
 
   let firstInput = null;
-  let busy = false;
-  let exiting = false;
+  let busy       = false;
+  let exiting    = false;
 
   rl.prompt();
 
@@ -207,13 +223,13 @@ export async function assistAction(resumedSession = null) {
 
       if (wantsSave) {
         const titleText = firstInput || orchestrator.history.find(m => m.role === 'user')?.content || '';
-        const title = resumedSession?.title || makeTitle(titleText);
+        const title     = resumedSession?.title || makeTitle(titleText);
 
         const payload = {
-          type: 'assist',
+          type:      'assist',
           title,
           directory: targetDir,
-          history: orchestrator.history,
+          history:   orchestrator.history,
           config: {
             roles:       config.roles,
             researcher:  config.researcher,
