@@ -16,7 +16,7 @@ All notable changes to the Pollinations CLI will be documented in this file.
 - **Researcher role** — Embedded in the orchestrator loop (not a separate file). Uses the Pollinations API with a configurable grounded search model (`gemini-search` by default) to fetch current technical information. Findings are injected into the Critic's next validation prompt (Truth Injection protocol).
 - **Configurable researcher model** — Set `researcher.model` in AGENTS.md to swap the search model. Uses your Pollinations API key automatically.
 - **Context compression** — When the session history exceeds 26 messages, older entries are summarised into a compact state snapshot by the Architect model, keeping the 8 most recent messages verbatim. Prevents performance degradation in long sessions.
-- **MCP environment variable injection** — The Pollinations API key (`POLLINATIONS_TOKEN`) is automatically forwarded to every MCP subprocess. Per-server `env:` blocks in AGENTS.md support `${VAR_NAME}` placeholders resolved from the host environment at runtime.
+- **MCP environment variable injection** — The Pollinations API key (`POLLINATIONS_API_KEY`) is automatically forwarded to every MCP subprocess. Per-server `env:` blocks in AGENTS.md support `${VAR_NAME}` placeholders resolved from the host environment at runtime.
 - **Multi-MCP support** — AGENTS.md now supports any number of MCP servers (Pollinations, GitHub, PostgreSQL, Slack, Filesystem, etc.) with commented-out examples in the generated template.
 
 ### Changed
