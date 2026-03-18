@@ -6,35 +6,50 @@ export class MCPManager {
     this.clients = new Map();
   }
 
-  async connect(serverName, command, args = []) {
+  _resolveEnvVars(envObj = {}) {
+    const out = {};
+    for (const [k, v] of Object.entries(envObj)) {
+      out[k] = typeof v === 'string'
+        ? v.replace(/\$\{([^}]+)\}/g, (_, name) => process.env[name] ?? '')
+        : String(v);
+    }
+    return out;
+  }
+
+  async connect(serverName, command, args = [], env = {}) {
     try {
-      const transport = new StdioClientTransport({ command, args });
-      const client = new Client(
-        { name: "pollina-agent", version: "1.2.4" },
-        { capabilities: {} }
-      );
+      const mergedEnv = { ...process.env, ...this._resolveEnvVars(env) };
+      const transport = new StdioClientTransport({ command, args, env: mergedEnv });
+      const client = new Client({ name: 'pollina-agent', version: '1.3.0' }, { capabilities: {} });
       await client.connect(transport);
       this.clients.set(serverName, client);
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
 
   async getExternalTools() {
-    const allTools = [];
+    const all = [];
     for (const [name, client] of this.clients) {
-      const { tools } = await client.listTools();
-      allTools.push(...tools.map(t => ({ ...t, server: name })));
+      try {
+        const { tools } = await client.listTools();
+        all.push(...tools.map(t => ({ ...t, server: name })));
+      } catch {
+        // server may have disconnected
+      }
     }
-    return allTools;
+    return all;
   }
 
   async callMcp(server, tool, args) {
     const client = this.clients.get(server);
-    if (!client) throw new Error(`MCP Server ${server} not connected`);
+    if (!client) throw new Error(`MCP server '${server}' is not connected.`);
     const result = await client.callTool({ name: tool, arguments: args });
     return JSON.stringify(result.content);
   }
-}
 
+  isConnected(name) {
+    return this.clients.has(name);
+  }
+}
