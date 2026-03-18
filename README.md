@@ -197,7 +197,7 @@ constraints:
 mcp_servers:
   - name:    "pollinations"
     command: "npx"
-    args:    ["-y", "@pollinations/mcp-server"]
+    args:    ["-y", "@pollinations_ai/mcp"]
 
 context: "Node.js ESM project on Pollinations.ai"
 ```
@@ -210,7 +210,7 @@ MCP servers extend Pollina with new capabilities. They are connected at startup 
 
 ### Credential injection
 
-Your Pollinations API key is automatically forwarded to every MCP server as `POLLINATIONS_TOKEN`. For servers that need other credentials, use the `env:` block in AGENTS.md with `${VAR_NAME}` placeholders:
+Your Pollinations API key is automatically forwarded to every MCP server as `POLLINATIONS_API_KEY`. For servers that need other credentials, use the `env:` block in AGENTS.md with `${VAR_NAME}` placeholders:
 
 ```yaml
 mcp_servers:
@@ -233,7 +233,7 @@ The `${VAR_NAME}` syntax resolves from `process.env` at startup — credentials 
 
 | Server | Package | Capability |
 |---|---|---|
-| Pollinations | `@pollinations/mcp-server` | Richer image generation (Flux, SDXL) |
+| Pollinations | `@pollinations_ai/mcp` | Richer image generation and more asset tools (Flux, SDXL) |
 | GitHub | `@modelcontextprotocol/server-github` | PRs, commits, issue search |
 | PostgreSQL | `@modelcontextprotocol/server-postgres` | Query and manage databases |
 | Slack | `@modelcontextprotocol/server-slack` | Send messages, read channels |
