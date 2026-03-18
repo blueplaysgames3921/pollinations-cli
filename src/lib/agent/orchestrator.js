@@ -11,6 +11,24 @@ import process from 'process';
 const COMPRESSION_THRESHOLD = 26;
 const COMPRESSION_KEEP_RECENT = 8;
 
+const CRITIC_SKIP_TOOLS = new Set([
+  'list_files',
+  'read_file',
+  'test_syntax',
+  'delete_file',
+  'move_file',
+  'capture_asset',
+]);
+
+const GREETING_PATTERNS = [
+  /^(hi|hello|hey|sup|yo|wassup|what'?s\s*up|howdy|hiya|greetings)[\s!?.]*$/i,
+  /^good\s+(morning|afternoon|evening|night|day)[\s!?.]*$/i,
+  /^how\s+(are\s+you|r\s+u|you\s+doing|is?\s+it\s+going)[\s!?.]*$/i,
+  /^(thanks?|thank\s+you|ty|thx|cheers|appreciated)[\s!?.]*$/i,
+  /^(ok|okay|k|sure|cool|nice|great|awesome|perfect|sounds?\s+good|got\s+it|understood|noted|alright)[\s!?.]*$/i,
+  /^(what\s+can\s+you\s+do|who\s+are\s+you|tell\s+me\s+about\s+yourself|what\s+are\s+you)[\s!?.]*$/i,
+];
+
 export class AgentOrchestrator {
   constructor(config) {
     this.config = config;
@@ -59,6 +77,11 @@ export class AgentOrchestrator {
     }
   }
 
+  _isGreeting(input) {
+    const trimmed = input.trim();
+    return GREETING_PATTERNS.some(p => p.test(trimmed));
+  }
+
   _extractJSON(str, openChar, closeChar, startIdx) {
     let depth = 0, inStr = false, esc = false;
     for (let i = startIdx; i < str.length; i++) {
@@ -88,8 +111,7 @@ export class AgentOrchestrator {
         if (json) candidates.push({ json, isArray: false, pos: i });
       }
     }
-    candidates.sort((a, b) => a.pos - b.pos);
-    return candidates;
+    return candidates.sort((a, b) => a.pos - b.pos);
   }
 
   parseAction(content, mcpTools) {
@@ -98,9 +120,7 @@ export class AgentOrchestrator {
     const mcpNames   = mcpTools?.map(t => t.name) || [];
     const allKnown   = new Set([...localNames, ...metaNames, ...mcpNames]);
 
-    const candidates = this._findAllJSONCandidates(content);
-
-    for (const { json, isArray } of candidates) {
+    for (const { json, isArray } of this._findAllJSONCandidates(content)) {
       try {
         const parsed = JSON.parse(json);
         const call   = isArray ? parsed[0] : parsed;
@@ -136,7 +156,7 @@ export class AgentOrchestrator {
         messages: [
           {
             role: 'system',
-            content: `You are a session memory compressor for an autonomous coding agent. Summarise the provided conversation history into a tight factual bullet-point state snapshot. Cover: files created/edited/deleted, shell commands run, errors encountered, key decisions made, and current project state. Be accurate and terse. No meta-commentary.`
+            content: `You are a session memory compressor for an autonomous coding agent. Summarise the provided conversation history into a tight factual bullet-point state snapshot. Cover: files created/edited/deleted, shell commands run and their outcomes, errors encountered and how they were resolved, key decisions made, and the current project state. Be accurate and terse. No meta-commentary.`
           },
           { role: 'user', content: JSON.stringify(toCompress) }
         ]
@@ -181,7 +201,7 @@ export class AgentOrchestrator {
           role: 'system',
           content: `You are the Architect in the Pollina swarm. Produce structured technical blueprints. No implementation code.
 Output: phases, file structure, key decisions, dependencies, pitfalls, and exact instructions for the Coder.
-If the task requires up-to-date API knowledge, flag "NEEDS_RESEARCH: <query>" explicitly so the Coder knows to call consult_researcher first.
+If the task requires up-to-date API knowledge, flag "NEEDS_RESEARCH: <query>" explicitly.
 Constraints:\n${constraints || '  - none'}
 Context: ${this.config.context || 'General development environment'}`
         },
@@ -191,13 +211,27 @@ Context: ${this.config.context || 'General development environment'}`
     return res.data.choices[0].message.content;
   }
 
+  _buildCriticContext() {
+    const recentOps = this.history
+      .slice(-12)
+      .filter(m => m.role === 'system' && m.content.startsWith('Tool Result'))
+      .map(m => m.content.slice(0, 300))
+      .join('\n---\n');
+    return recentOps || null;
+  }
+
   async callCritic(action, result, ghostResult, researchCtx) {
-    const args = action.args ? JSON.stringify(action.args, null, 2) : 'none';
+    const args         = action.args ? JSON.stringify(action.args, null, 2) : 'none';
+    const recentOps    = this._buildCriticContext();
+
     const researchPart = researchCtx
-      ? `\n\nCURRENT RESEARCH CONTEXT (treat as ground truth — more current than your training data):\n${researchCtx}`
+      ? `\n\nCURRENT RESEARCH CONTEXT (treat as ground truth over training data):\n${researchCtx}`
       : '';
-    const ghostPart = (ghostResult && ghostResult !== 'SYNTAX_OK' && ghostResult !== null)
-      ? `\n\nGHOST RUNTIME RESULT (pre-execution syntax check):\n${ghostResult}`
+    const ghostPart    = (ghostResult && ghostResult !== 'SYNTAX_OK' && ghostResult !== null)
+      ? `\n\nGHOST RUNTIME RESULT:\n${ghostResult}`
+      : '';
+    const opsPart      = recentOps
+      ? `\n\nRECENT TOOL RESULTS (project context):\n${recentOps}`
       : '';
 
     const res = await this.api.post('/v1/chat/completions', {
@@ -205,15 +239,20 @@ Context: ${this.config.context || 'General development environment'}`
       messages: [
         {
           role: 'system',
-          content: `You are the Technical Critic in the Pollina swarm. You are the final gate before code reaches disk.
+          content: `You are the Technical Critic in the Pollina swarm. You validate a specific tool action. You do NOT audit the whole codebase. You do NOT ask for more files. You validate only what is provided.
+
 Rules:
-1. A SYNTAX_ERROR from the ghost runtime is an automatic FAIL. Do not override it.
-2. Use Research Context to verify library/API usage. It is more current than your training data.
-3. Fail on any of: truncated code, missing imports, wrong function signatures, hardcoded secrets, logic errors, placeholder comments like "// rest of code here".
-4. Respond with EXACTLY one of:
+1. SYNTAX_ERROR from ghost runtime = automatic FAIL. Do not override.
+2. Use Research Context to verify library/API usage — it is more current than your training data.
+3. Use Recent Tool Results for project context when validating imports or file references.
+4. For write_file / edit_file: fail on truncated code, missing imports that cannot be resolved, wrong signatures, hardcoded secrets, logic errors, placeholder comments ("// rest of code").
+5. For shell_exec: fail on dangerous patterns or commands that would break the project.
+6. For generate_image: fail only if prompt or parameters are obviously wrong.
+7. Do NOT fail because you want to see more files. Do NOT fail because output looks brief. A list of filenames IS a complete and correct result for list_files.
+8. Respond with EXACTLY one of:
    PASS
-   FAIL: [specific actionable reason]
-Nothing else. No explanation for a pass. No padding.${researchPart}${ghostPart}`
+   FAIL: [specific actionable reason in one sentence]
+Nothing else.${researchPart}${ghostPart}${opsPart}`
         },
         {
           role: 'user',
@@ -247,6 +286,24 @@ Nothing else. No explanation for a pass. No padding.${researchPart}${ghostPart}`
   }
 
   async run(userInput) {
+    if (this._isGreeting(userInput)) {
+      const res = await this.api.post('/v1/chat/completions', {
+        model: this.config.roles?.coder || 'qwen-coder',
+        messages: [
+          {
+            role: 'system',
+            content: `You are Pollina, an autonomous swarm agent built on Pollinations.ai by blueplaysgames3921. This is a casual conversational exchange. Reply naturally and helpfully in one or two sentences. Do not mention tools, files, or projects unless the user brings it up.`
+          },
+          { role: 'user', content: userInput }
+        ]
+      });
+      const reply = res.data.choices[0].message.content;
+      this.history.push({ role: 'user', content: userInput });
+      this.history.push({ role: 'assistant', content: reply });
+      console.log(`\n${this.colors.pollina('🐝 [Pollina]:')} ${chalk.white(reply)}\n`);
+      return;
+    }
+
     this.history.push({ role: 'user', content: userInput });
     this.latestResearchContext = null;
     let iteration = 0;
@@ -307,19 +364,13 @@ Nothing else. No explanation for a pass. No padding.${researchPart}${ghostPart}`
 
         if (ghostResult === 'DANGEROUS_COMMAND_BLOCKED') {
           console.log(chalk.red('BLOCKED'));
-          this.history.push({
-            role: 'system',
-            content: `Safety: the shell command was blocked as catastrophically dangerous. Choose a safer approach.`
-          });
+          this.history.push({ role: 'system', content: `Safety: shell command blocked as dangerous. Choose a safer approach.` });
           continue;
         }
 
         if (ghostResult?.startsWith('SYNTAX_ERROR')) {
           console.log(chalk.red('SYNTAX ERROR'));
-          this.history.push({
-            role: 'system',
-            content: `Ghost runtime rejected write_file — fix these syntax errors before retrying:\n${ghostResult}`
-          });
+          this.history.push({ role: 'system', content: `Ghost runtime rejected write_file — fix these syntax errors before retrying:\n${ghostResult}` });
           continue;
         }
 
@@ -329,9 +380,11 @@ Nothing else. No explanation for a pass. No padding.${researchPart}${ghostPart}`
 
         console.log(chalk.green('SUCCESS'));
 
-        if (this.config.roles?.critic) {
+        const needsCritic = this.config.roles?.critic && !CRITIC_SKIP_TOOLS.has(action.tool);
+
+        if (needsCritic) {
           const validation = await this.callCritic(action, result, ghostResult, this.latestResearchContext);
-          const pass = validation.trim().toUpperCase().startsWith('PASS');
+          const pass       = validation.trim().toUpperCase().startsWith('PASS');
 
           this.history.push({
             role: 'system',
@@ -389,95 +442,91 @@ CONSTRAINTS [ENFORCE ON EVERY ACTION — NON-NEGOTIABLE]:
 ${constraints || '  ► none specified'}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-WHEN TO USE TOOLS vs WHEN TO JUST TALK
+CONVERSATIONAL RULE — READ FIRST
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-USE TOOLS when user asks you to DO something concrete:
-  Keywords: build, create, write, make, fix, add, remove, delete,
-            install, run, generate, refactor, deploy, test, update,
-            search, fetch, download, move, rename
+If the user is ONLY greeting, chatting, or asking a general question:
+  → Respond in plain text. Use ZERO tools. Do NOT list files. Do NOT read files.
+  → You already know you are in a development environment. You do NOT need to survey it.
 
-DO NOT USE TOOLS when:
-  • User greets you: "hi", "hello", "hey", "yo", "sup" → reply naturally, no tools
-  • User asks a question you can answer from knowledge → just answer
-  • User says "thank you", "ok", "sounds good" → acknowledge, no tools
-  • User asks "what can you do" → explain your capabilities, no tools
-  • The response is purely text and requires no files, commands, or data
+Examples of conversational input (no tools ever):
+  "hi" / "hey" / "sup" / "what can you do" / "how are you" / "thanks"
 
-Rule: if no file system or shell action is needed to satisfy the request, do not use any tool.
+Examples of task input (tools appropriate):
+  "create a landing page" / "fix the bug in auth.js" / "add a dark mode toggle"
+
+The difference: tasks have a clear deliverable. Greetings do not.
+If there is any doubt — just respond in text. Never run tools on a hunch.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TOOL CALL FORMAT — STRICT AND EXACT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Output EXACTLY ONE raw JSON object per response. No markdown fences. No wrapper text.
+Output EXACTLY ONE raw JSON object per response. No markdown fences. No wrapper text around it.
 
 CORRECT:
 {"tool": "write_file", "args": {"filePath": "src/app.js", "content": "..."}}
 
-WRONG (code block wrapper):
+WRONG (code fence):
 \`\`\`json
 {"tool": "write_file", "args": {...}}
 \`\`\`
 
-WRONG (shorthand — crashes parser):
+WRONG (shorthand):
 [write_file(src/app.js)]
 
-WRONG (two objects in one response — only first is read):
+WRONG (two objects — only first is read):
 {"tool": "list_files", "args": {}} {"tool": "write_file", "args": {...}}
 
-After a tool call is executed the system will report SUCCESS or the error.
-Do not output a second tool call in the same message — wait for the system result first.
+Wait for the system to report SUCCESS or the error before taking the next action.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FILE EDITING STRATEGY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-For SMALL CHANGES to an existing file (add a function, fix a bug, change a line):
-  1. read_file first — you MUST see current content and line numbers
-  2. Use edit_file with the correct operation:
-     insert_after / insert_before — add new lines at a position
-     delete_lines                 — remove lines from:to
-     replace_lines                — replace lines from:to with new content
-     replace_text                 — find exact text anywhere and replace all occurrences
+For SMALL CHANGES (fix a bug, add a function, change a line):
+  1. read_file — see current content and line numbers
+  2. edit_file — use the right operation:
+       insert_after / insert_before  — add lines at a position
+       delete_lines                  — remove lines from:to
+       replace_lines                 — replace lines from:to with new content
+       replace_text                  — find exact text anywhere and replace all occurrences
 
 For NEW FILES or COMPLETE REWRITES:
-  1. test_syntax first if it is .js or .json
-  2. write_file with the COMPLETE final content — never truncate, never use "// rest of code here"
+  1. test_syntax first (for .js or .json)
+  2. write_file with COMPLETE final content — never truncate, never write "// rest of code here"
   3. Truncated content = automatic Critic FAIL
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-QUALITY PROTOCOL — FOLLOW EVERY TIME
+QUALITY PROTOCOL
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. Multi-file tasks → consult_architect FIRST, then follow the blueprint.
-2. Uncertain about API, version, or library → consult_researcher. Never guess syntax.
-3. Writing .js or .json → test_syntax BEFORE write_file. A ghost SYNTAX_ERROR blocks the write.
-4. Before edit_file → always read_file to see the actual current lines and numbers.
-5. After writing a file → verify with list_files or read_file.
-6. After MCP image generation → capture_asset IMMEDIATELY. Those URLs are transient and expire.
-7. Path safety: all paths resolve from ${cwd}. "../" to escape the working directory is permanently blocked.
-8. SUCCESS is confirmed only when the system reports SUCCESS — never assume a tool worked.
+1. Multi-file tasks → consult_architect FIRST, then follow the blueprint
+2. Uncertain about API, version, or library → consult_researcher. Never guess syntax
+3. Writing .js or .json → test_syntax BEFORE write_file
+4. Before edit_file → read_file to see actual current lines
+5. After writing a file → verify with list_files or read_file
+6. After MCP image generation → capture_asset IMMEDIATELY (those URLs expire)
+7. Path safety: all paths resolve from ${cwd}. No "../" to escape
+8. SUCCESS confirmed only when system reports SUCCESS — never assume
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 HANDLING FAILURES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 After a Critic FAIL:
-  • Read the specific reason carefully.
-  • Fix ONLY what the Critic flagged — do not rewrite unrelated code.
-  • Use edit_file if the fix is targeted. Use write_file only if the whole file must be corrected.
-  • Do not try the same thing again unchanged — that will fail again.
+  • Read the specific reason. Fix ONLY what was flagged.
+  • Use edit_file for targeted fixes. write_file only if the whole file must change.
+  • Do not retry the same content unchanged — it will fail again.
 
 After a tool ERROR:
-  • Read the error message in the system result.
-  • If it is a path issue: use list_files to verify the path exists first.
-  • If it is a syntax error: use test_syntax to validate before retrying write_file.
-  • If it is a missing package: use shell_exec to run npm install.
+  • Path errors → list_files first to verify the path exists
+  • Syntax errors → test_syntax before retrying write_file
+  • Missing packages → shell_exec npm install
 
 After max iterations:
-  • Summarise what was completed and what still needs doing.
-  • The user can send a follow-up message to continue.
+  • Summarise what was completed and what still needs doing
+  • The user can send a follow-up to continue
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 AVAILABLE TOOLS
