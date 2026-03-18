@@ -7,7 +7,12 @@ const SESSIONS_PATH = path.join(os.homedir(), '.pollinations', 'sessions.json');
 async function load() {
   await fs.ensureDir(path.dirname(SESSIONS_PATH));
   if (!(await fs.pathExists(SESSIONS_PATH))) return { nextId: 1, sessions: [] };
-  return fs.readJson(SESSIONS_PATH);
+  try {
+    return await fs.readJson(SESSIONS_PATH);
+  } catch {
+    console.error('  ⚠ sessions.json is corrupted — starting fresh.');
+    return { nextId: 1, sessions: [] };
+  }
 }
 
 async function persist(data) {
@@ -17,7 +22,7 @@ async function persist(data) {
 
 export async function saveSession(data) {
   const store = await load();
-  const id = store.nextId;
+  const id    = store.nextId;
   store.sessions.push({ id, ...data, savedAt: new Date().toLocaleString() });
   store.nextId = id + 1;
   await persist(store);
@@ -26,7 +31,7 @@ export async function saveSession(data) {
 
 export async function updateSession(id, data) {
   const store = await load();
-  const idx = store.sessions.findIndex(s => s.id === id);
+  const idx   = store.sessions.findIndex(s => s.id === id);
   if (idx === -1) throw new Error(`Session ${id} not found.`);
   store.sessions[idx] = { ...store.sessions[idx], ...data, savedAt: new Date().toLocaleString() };
   await persist(store);
@@ -47,4 +52,3 @@ export function makeTitle(text) {
   const clean = text.replace(/\n/g, ' ').trim();
   return clean.length > 52 ? clean.slice(0, 52) + '…' : clean;
 }
-
