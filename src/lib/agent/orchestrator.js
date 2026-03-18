@@ -42,7 +42,7 @@ export class AgentOrchestrator {
     if (this.config.mcp_servers?.length) {
       for (const srv of this.config.mcp_servers) {
         const serverEnv = {
-          ...(apiKey ? { POLLINATIONS_TOKEN: apiKey } : {}),
+          ...(apiKey ? { POLLINATIONS_API_KEY: apiKey } : {}),
           ...(srv.env || {})
         };
         const ok = await this.mcp.connect(srv.name, srv.command, srv.args || [], serverEnv);
