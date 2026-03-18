@@ -112,7 +112,7 @@ export async function authAction() {
 }
 
 function saveKey(key) {
-  if (key && key.length > 10) {
+  if (key && key.length >= 10) {
     config.set('apiKey', key);
     console.log(`\n${chalk.green('✔')} ${chalk.bold('Welcome to the Swarm.')} Your key is securely stored.`);
     console.log(chalk.dim('Terminal synchronized.\n'));
