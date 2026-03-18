@@ -17,7 +17,7 @@ export async function authAction() {
   console.log(beeGradient(figlet.textSync('POLLINATIONS', { font: 'ANSI Shadow' })));
   
 
-  console.log(chalk.white('  VERSION: ') + chalk.bold.yellow('v1.2.4'));
+  console.log(chalk.white('  VERSION: ') + chalk.bold.yellow('v1.3.0'));
   console.log(chalk.white('  CREATOR: ') + chalk.bold.cyan('blueplaysgames3921'));
   console.log(chalk.white('  INFRASTRUCTURE:   ') + chalk.bold.green('pollinations.ai'));
   console.log('\n' + grassTheme('☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘☘') + '\n');
