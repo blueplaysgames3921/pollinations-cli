@@ -56,7 +56,7 @@ constraints:
 mcp_servers:
   - name:    "pollinations"
     command: "npx"
-    args:    ["-y", "@pollinations/mcp-server"]
+    args:    ["-y", "@pollinations_ai/mcp"]
 
   # GitHub — create PRs, commit code, search issues
   # Uncomment and export GITHUB_TOKEN before running
