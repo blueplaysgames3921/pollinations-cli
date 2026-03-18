@@ -1,3 +1,4 @@
+
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
@@ -16,7 +17,7 @@ export async function templateRun(name, options) {
   const temp = await fs.readJson(path.join(tempDir, `${name}.json`));
   let final = temp.content;
   for (const [key, val] of Object.entries(options)) {
-    final = final.replace(`{${key}}`, val);
+    final = final.split(`{${key}}`).join(val);
   }
   await textAction(final, {});
 }
