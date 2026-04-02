@@ -16,7 +16,7 @@ import { templateSave, templateRun } from '../src/commands/template.js';
 import { sessionAction, continueAction } from '../src/commands/sessions.js';
 import { config } from '../src/lib/config-store.js';
 
-program.name('pollinations').version('1.3.0');
+program.name('pollinations').version('1.3.1');
 
 program.command('login')
   .description('Set your Pollinations API key')
