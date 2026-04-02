@@ -1,3 +1,4 @@
+
 import fs from 'fs-extra';
 import path from 'path';
 import yaml from 'yaml';
@@ -19,6 +20,8 @@ async function findAgentFile(startDir) {
   return null;
 }
 
+// FIX: mcp_servers was [] — pollinations MCP was never launched without an
+// AGENTS.md. Now it's included by default so `assist` works out of the box.
 const DEFAULT_CONFIG = {
   roles:       { architect: 'mistral', coder: 'qwen-coder', critic: 'openai', artist: 'flux' },
   researcher:  { model: 'gemini-search', enabled: true },
@@ -29,11 +32,16 @@ const DEFAULT_CONFIG = {
     'Never hardcode API keys or secrets'
   ],
   context:     'General purpose development environment',
-  mcp_servers: []
+  mcp_servers: [
+    { name: 'pollinations', command: 'npx', args: ['-y', '@pollinations_ai/mcp'] }
+  ]
 };
 
 function buildDefaultAgentsMd(dir) {
   return `# 🐝 Pollina Agent Configuration
+
+Edit this file to configure Pollina's roles, constraints, researcher settings, and MCP servers.
+Changes take effect the next time you run \`pollinations assist\`.
 
 \`\`\`yaml
 roles:
@@ -59,27 +67,11 @@ mcp_servers:
     args:    ["-y", "@pollinations_ai/mcp"]
 
   # GitHub — create PRs, commit code, search issues
-  # Set GITHUB_TOKEN in your environment before running
   # - name:    "github"
   #   command: "npx"
   #   args:    ["-y", "@modelcontextprotocol/server-github"]
   #   env:
   #     GITHUB_TOKEN: "\${GITHUB_TOKEN}"
-
-  # PostgreSQL — query and manage databases
-  # - name:    "postgres"
-  #   command: "npx"
-  #   args:    ["-y", "@modelcontextprotocol/server-postgres"]
-  #   env:
-  #     POSTGRES_CONNECTION_STRING: "\${POSTGRES_CONNECTION_STRING}"
-
-  # Slack — send messages and read channels
-  # - name:    "slack"
-  #   command: "npx"
-  #   args:    ["-y", "@modelcontextprotocol/server-slack"]
-  #   env:
-  #     SLACK_BOT_TOKEN: "\${SLACK_BOT_TOKEN}"
-  #     SLACK_TEAM_ID:   "\${SLACK_TEAM_ID}"
 
 context: "This project is located at ${dir}"
 \`\`\`
@@ -88,26 +80,42 @@ context: "This project is located at ${dir}"
 
 async function loadConfig(dir) {
   const agentPath = await findAgentFile(dir);
-  let config      = { ...DEFAULT_CONFIG, context: `Project at: ${dir}` };
+
+  // Deep-copy defaults so mutations don't bleed between calls
+  const config = {
+    ...DEFAULT_CONFIG,
+    roles:       { ...DEFAULT_CONFIG.roles },
+    researcher:  { ...DEFAULT_CONFIG.researcher },
+    constraints: [...DEFAULT_CONFIG.constraints],
+    mcp_servers: DEFAULT_CONFIG.mcp_servers.map(s => ({ ...s, args: [...s.args] })),
+    context:     `Project at: ${dir}`
+  };
 
   if (!agentPath) return { config, agentPath: null };
 
-  const raw   = await fs.readFile(agentPath, 'utf8');
-  const match = raw.match(/```yaml([\s\S]*?)```/);
-  if (!match) return { config, agentPath };
+  const raw = await fs.readFile(agentPath, 'utf8');
+  // FIX: normalise Windows CRLF → LF so the regex and YAML parser work on
+  // files authored on Windows, which would otherwise fail silently.
+  const normalized = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const match      = normalized.match(/```yaml([\s\S]*?)```/);
+
+  if (!match) {
+    console.log(chalk.yellow(`  ⚠ AGENTS.md found but no \`\`\`yaml block detected — using defaults.`));
+    return { config, agentPath };
+  }
 
   try {
     const parsed = yaml.parse(match[1]);
-    config = {
-      ...config,
-      ...parsed,
-      roles:       { ...DEFAULT_CONFIG.roles,      ...(parsed.roles       || {}) },
-      researcher:  { ...DEFAULT_CONFIG.researcher, ...(parsed.researcher  || {}) },
-      constraints: parsed.constraints || DEFAULT_CONFIG.constraints,
-      mcp_servers: parsed.mcp_servers || DEFAULT_CONFIG.mcp_servers
-    };
-  } catch {
-    console.error(chalk.red('  ✖ Failed to parse AGENTS.md YAML. Check your syntax.'));
+    if (!parsed || typeof parsed !== 'object') throw new Error('YAML did not parse to an object');
+
+    if (parsed.roles)                        Object.assign(config.roles,      parsed.roles);
+    if (parsed.researcher)                   Object.assign(config.researcher, parsed.researcher);
+    if (parsed.constraints)                  config.constraints = parsed.constraints;
+    if (Array.isArray(parsed.mcp_servers))   config.mcp_servers = parsed.mcp_servers;
+    if (parsed.context)                      config.context     = parsed.context;
+  } catch (err) {
+    console.error(chalk.red(`  ✖ Failed to parse AGENTS.md YAML: ${err.message}`));
+    console.error(chalk.dim('  Using defaults. Validate your YAML at https://yamlchecker.com'));
   }
 
   return { config, agentPath };
@@ -115,14 +123,11 @@ async function loadConfig(dir) {
 
 function displaySessionRecap(history) {
   if (!history?.length) return;
-
   const userMessages = history.filter(m => m.role === 'user');
-  const total        = history.length;
   const lastUser     = userMessages[userMessages.length - 1]?.content || '';
   const preview      = lastUser.length > 80 ? lastUser.slice(0, 80) + '…' : lastUser;
-
   console.log(chalk.dim('  ' + '─'.repeat(54)));
-  console.log(chalk.dim(`  Session history: ${total} messages, ${userMessages.length} tasks`));
+  console.log(chalk.dim(`  Session history: ${history.length} messages, ${userMessages.length} tasks`));
   if (preview) console.log(chalk.dim(`  Last task: "${preview}"`));
   console.log(chalk.dim('  ' + '─'.repeat(54)));
   console.log('');
@@ -143,36 +148,27 @@ export async function assistAction(resumedSession = null) {
   let targetDir = process.cwd();
   if (resumedSession?.directory) {
     const exists = await fs.pathExists(resumedSession.directory);
-    if (exists) {
-      targetDir = resumedSession.directory;
-    } else {
-      console.log(chalk.yellow(`  ⚠ Saved directory no longer exists — using current directory.\n`));
-    }
+    targetDir = exists ? resumedSession.directory : targetDir;
+    if (!exists) console.log(chalk.yellow(`  ⚠ Saved directory no longer exists — using current directory.\n`));
   }
 
-  if (targetDir !== process.cwd()) {
-    process.chdir(targetDir);
-  }
+  if (targetDir !== process.cwd()) process.chdir(targetDir);
 
-  const { config, agentPath } = await loadConfig(targetDir);
+  let { config, agentPath } = await loadConfig(targetDir);
 
   if (resumedSession?.config) {
     const rc = resumedSession.config;
-    Object.assign(config, {
-      ...rc,
-      roles:       { ...config.roles,      ...(rc.roles       || {}) },
-      researcher:  { ...config.researcher, ...(rc.researcher  || {}) },
-      constraints: rc.constraints || config.constraints,
-      mcp_servers: rc.mcp_servers || config.mcp_servers
-    });
+    if (rc.roles)       Object.assign(config.roles,      rc.roles);
+    if (rc.researcher)  Object.assign(config.researcher, rc.researcher);
+    if (rc.constraints) config.constraints = rc.constraints;
+    if (rc.mcp_servers) config.mcp_servers = rc.mcp_servers;
+    if (rc.context)     config.context     = rc.context;
   }
 
-  if (resumedSession?.history?.length) {
-    config._resumedHistory = resumedSession.history;
-  }
+  if (resumedSession?.history?.length) config._resumedHistory = resumedSession.history;
 
   const rl = readline.createInterface({
-    input: process.stdin,
+    input:  process.stdin,
     output: process.stdout,
     prompt: chalk.cyan('You ❯ ')
   });
@@ -181,9 +177,11 @@ export async function assistAction(resumedSession = null) {
     const answer = await new Promise(resolve => {
       rl.question(chalk.yellow('  No AGENTS.md found. Create one here? (y/n): '), resolve);
     });
-    if (answer.toLowerCase() === 'y') {
+    if (answer.trim().toLowerCase() === 'y') {
       await fs.writeFile(path.join(targetDir, 'AGENTS.md'), buildDefaultAgentsMd(targetDir));
       console.log(chalk.green('  ✔ Created AGENTS.md'));
+      // FIX: reload so the newly written file is used in this session immediately
+      ({ config, agentPath } = await loadConfig(targetDir));
     }
   }
 
@@ -211,31 +209,22 @@ export async function assistAction(resumedSession = null) {
     if (exiting) return;
     const input = line.trim();
 
-    if (!input) {
-      rl.prompt();
-      return;
-    }
+    if (!input) { rl.prompt(); return; }
 
     if (input.toLowerCase() === 'exit') {
       exiting = true;
-
       const wantsSave = await promptSave(rl);
 
       if (wantsSave) {
         const titleText = firstInput || orchestrator.history.find(m => m.role === 'user')?.content || '';
         const title     = resumedSession?.title || makeTitle(titleText);
-
-        const payload = {
-          type:      'assist',
-          title,
-          directory: targetDir,
-          history:   orchestrator.history,
+        const payload   = {
+          type: 'assist', title, directory: targetDir,
+          history: orchestrator.history,
           config: {
-            roles:       config.roles,
-            researcher:  config.researcher,
-            constraints: config.constraints,
-            mcp_servers: config.mcp_servers,
-            context:     config.context
+            roles: config.roles, researcher: config.researcher,
+            constraints: config.constraints, mcp_servers: config.mcp_servers,
+            context: config.context
           }
         };
 
@@ -252,10 +241,7 @@ export async function assistAction(resumedSession = null) {
       return;
     }
 
-    if (busy) {
-      console.log(chalk.dim('  (busy — please wait for the current task to finish)'));
-      return;
-    }
+    if (busy) { console.log(chalk.dim('  (busy — please wait)')); return; }
 
     if (!firstInput) firstInput = input;
     busy = true;
@@ -264,9 +250,5 @@ export async function assistAction(resumedSession = null) {
     if (!exiting) rl.prompt();
   });
 
-  rl.on('close', () => {
-    console.log(chalk.dim('\n  Session ended.'));
-    process.exit(0);
-  });
+  rl.on('close', () => { console.log(chalk.dim('\n  Session ended.')); process.exit(0); });
 }
-
