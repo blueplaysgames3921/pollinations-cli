@@ -29,9 +29,9 @@ export async function authAction() {
   console.log(chalk.cyan('└─────────────────────────────────────────────────────────────────┘\n'));
 
   console.log(chalk.yellow('╔════════════════════════════════════════════════════════════════╗'));
-  console.log(chalk.yellow('║') + chalk.white('  [1] Login via Pollinations Gateway (BYOP) [RECOMMENDED]      ') + chalk.yellow('║'));
+  console.log(chalk.yellow('║') + chalk.white('  [1] Login via Pollinations Gateway (input: byop) [RECOMMENDED]      ') + chalk.yellow('║'));
   console.log(chalk.yellow('╠════════════════════════════════════════════════════════════════╣'));
-  console.log(chalk.yellow('║') + chalk.white('  [2] Enter API Key Manually                                    ') + chalk.yellow('║'));
+  console.log(chalk.yellow('║') + chalk.white('  [2] Enter API Key Manually (input: manual)                                   ') + chalk.yellow('║'));
   console.log(chalk.yellow('╚════════════════════════════════════════════════════════════════╝\n'));
 
   const { method } = await inquirer.prompt([
