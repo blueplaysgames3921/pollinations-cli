@@ -2,6 +2,28 @@
 
 All notable changes to the Pollinations CLI will be documented in this file.
 
+## [1.3.1] - 2026-04-03
+
+### Fixed
+
+- **BYOP auth flow broken on all platforms** — Web pages used `fetch` with `mode: "no-cors"` which silently swallows `ECONNREFUSED`, so the browser always reported success even when the CLI never received the key. Switched to `mode: "cors"` with a 5-second timeout so real failures surface correctly.
+- **Key in browser still failed** — CLI server parsed `req.url` using `req.headers.host` as the base, which is undefined on some systems, silently breaking the key handler. Fixed with a hardcoded `127.0.0.1:9999` base URL.
+- **IPv4/IPv6 localhost mismatch** — Server bound to `::1` on some systems while the browser hit `127.0.0.1`, causing `ECONNREFUSED` despite the server running. Now binds explicitly to `127.0.0.1`.
+- **Port conflict crashed with no useful message** — `EADDRINUSE` was unhandled, producing a raw Node exception. Now catches it and prints a clear message with the command to free the port.
+- **`pollina_key` never saved after SSO login** — `/auth` sent the key to the CLI and called `login()` but never wrote to `localStorage`, causing an infinite SSO loop on subsequent logins. Key is now persisted immediately.
+- **Key corrupted in transit** — API keys were interpolated into fetch URLs without `encodeURIComponent`. Tokens containing `+`, `=`, or `&` would arrive malformed.
+- **Pollinations MCP never connected without `AGENTS.md`** — `DEFAULT_CONFIG.mcp_servers` was `[]`. The agent now ships with the Pollinations MCP server in the default config so `pollinations assist` works out of the box.
+- **`AGENTS.md` YAML ignored on Windows** — CRLF line endings caused silent parse failures, falling back to defaults. Line endings are now normalised before parsing.
+- **`permission denied` on all commands after install (including Termux)** — `npm install -g` did not reliably mark the binary as executable. Added a `prepare` script to `package.json` that `chmod 755`s the bin file automatically on install, fixing the issue on Linux, macOS, and Termux mobile environments.
+
+### Changed
+
+- **`src/commands/auth.js`** — BYOP server now has CORS headers on all responses, OPTIONS preflight handling, `EADDRINUSE` handler, explicit `127.0.0.1` bind, graceful SIGINT, and `open()` fallback that prints the URL if no browser is available.
+- **`src/commands/assist.js`** — Default config includes Pollinations MCP, CRLF normalisation in `loadConfig()`, and config reloads immediately after a new `AGENTS.md` is created.
+- **`package.json`** — Added `prepare` script for post-install bin permissions. Bumped version to `1.3.1`.
+
+---
+
 ## [1.3.0] - 2026-03-18
 
 ### Added
