@@ -8,8 +8,13 @@ export const SETTINGS_DEFAULTS = {
   'defaults.image.model':       'zimage',
   'defaults.audio.model':       'elevenlabs',
   'defaults.video.model':       'veo',
-  'defaults.transcribe.model':  'whisper-large-v3',
+  'defaults.transcribe.model':  'whisper',
   'defaults.audio.voice':       'rachel',
+
+  // Agent roles
+  'agent.indexer.model':        'mistral',
+  'agent.analyser.model':       'llama-scout',
+  'agent.executor.model':       'openai',
 
   // Output
   'defaults.image.width':       1024,
@@ -152,3 +157,4 @@ export function getAllSettings() {
 export function isCustomized(key) {
   return config.get(`settings.${key}`) !== undefined;
 }
+
