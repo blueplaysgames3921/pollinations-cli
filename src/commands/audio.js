@@ -34,7 +34,7 @@ export async function audioAction(prompt, options) {
       }, { responseType: 'stream' }),
       api,
       model,
-      { maxRetries: 3 }
+      { maxRetries: 3, type: 'audio' }
     );
 
     const out    = options.output || `audio_${Date.now()}.${format}`;
