@@ -8,15 +8,14 @@ import ora from 'ora';
 import inquirer from 'inquirer';
 import FormData from 'form-data';
 
-const DEFAULT_STT_MODEL = 'whisper-large-v3';
+const DEFAULT_STT_MODEL = 'whisper';
 
-// Known STT models per the API spec
+// STT models — hasAudioIn: true in the official audio model list
 const KNOWN_STT_MODELS = new Set([
-  'whisper-large-v3',
-  'whisper-1',
-  'scribe',
-  'universal-2',
-  'universal-3-pro',
+  'whisper',          // Whisper Large V3
+  'universal-2',      // AssemblyAI Universal-2
+  'scribe',           // ElevenLabs Scribe v2
+  'universal-3-pro',  // AssemblyAI Universal-3 Pro
 ]);
 
 const SUPPORTED_FORMATS = new Set([
@@ -101,7 +100,7 @@ export async function transcribeAction(filePath, options = {}) {
       },
       api,
       chosenModel,
-      { maxRetries: 3 }
+      { maxRetries: 3, type: 'audio-stt' }
     );
 
     spinner.stop();
