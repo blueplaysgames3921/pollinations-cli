@@ -7,7 +7,7 @@ export const SETTINGS_DEFAULTS = {
   'defaults.text.model':        'openai',
   'defaults.image.model':       'zimage',
   'defaults.audio.model':       'elevenlabs',
-  'defaults.video.model':       'veo',
+  'defaults.video.model':       'ltx-2',
   'defaults.transcribe.model':  'whisper',
   'defaults.audio.voice':       'rachel',
 
