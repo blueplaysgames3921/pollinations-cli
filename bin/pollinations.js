@@ -7,6 +7,10 @@ import { audioAction }                                   from '../src/commands/a
 import { videoAction }                                   from '../src/commands/video.js';
 import { transcribeAction }                              from '../src/commands/transcribe.js';
 import { uploadAction }                                  from '../src/commands/upload.js';
+import { qrAction }                                       from '../src/commands/qr.js';
+import { removeBgAction }                                 from '../src/commands/remove-bg.js';
+import { diagramAction }                                  from '../src/commands/diagram.js';
+import { searchAction }                                   from '../src/commands/search.js';
 import { listModels }                                    from '../src/commands/models.js';
 import { batchAction }                                   from '../src/commands/batch.js';
 import { assistAction }                                  from '../src/commands/assist.js';
@@ -70,7 +74,7 @@ program.command('audio <prompt>')
 
 program.command('transcribe <file>')
   .description('Transcribe a local audio file to text. Supports mp3, mp4, wav, webm, ogg, flac, m4a. Defaults to whisper-large-v3. If the model you choose is not an STT model, you will be prompted to switch, proceed, or cancel.')
-  .option('-m, --model <model>',   'STT model to use. Overrides defaults.transcribe.model setting. Options: whisper-large-v3, whisper-1, scribe, universal-2, universal-3-pro.')
+  .option('-m, --model <model>',   'STT model to use (default: whisper). Options: whisper, universal-2, scribe, universal-3-pro.')
   .option('-l, --language <lang>', 'Language hint to improve accuracy (e.g. en, fr, es). Auto-detected if omitted.')
   .option('-o, --output <path>',   'Save the transcript to a file instead of printing to stdout')
   .option('-k, --key <key>',       'Override your registered API key for this request only')
@@ -96,6 +100,41 @@ program.command('upload <file>')
   .option('--copy',          'Copy the returned URL to your clipboard after upload')
   .option('-k, --key <key>', 'Override your registered API key for this request only')
   .action(uploadAction);
+
+program.command('search <query>')
+  .description('Search the web using a search-capable AI model and get a cited, formatted answer. Uses gemini-search by default which has native web access.')
+  .option('-m, --model <model>', `Search-capable model to use (default: gemini-search). Options: gemini-search, perplexity-fast, perplexity-reasoning, gemini, gemini-large.`)
+  .option('--raw',               'Return a minimal answer without extra formatting')
+  .option('-k, --key <key>',     'Override your registered API key for this request only')
+  .action(searchAction);
+
+program.command('qr <text>')
+  .description('Generate a QR code from any text or URL and save it locally. Runs entirely offline — no API call, no Pollen cost.')
+  .option('-o, --output <path>',  'Output file path. Extension determines format: .png (default), .svg, or .txt')
+  .option('-s, --size <pixels>',  'Width/height of the QR image in pixels (default: 300)')
+  .option('--margin <number>',    'Quiet zone margin around the QR code (default: 2)')
+  .option('--dark <hex>',         'Dark module colour as hex (default: #000000)')
+  .option('--light <hex>',        'Light module colour as hex (default: #ffffff)')
+  .option('--error <level>',      'Error correction level: L, M (default), Q, or H')
+  .option('--print',              'Also print the QR code as ASCII in the terminal')
+  .action(qrAction);
+
+program.command('remove-bg <file>')
+  .description('Remove the background from a local image. Uploads the image first to get a URL, then sends it to the background removal model. Output is a PNG with a transparent background.')
+  .option('-o, --output <path>',  'Output file path (default: <filename>_nobg.png)')
+  .option('-m, --model <model>',  'Image model to use for background removal (default: p-image-edit)')
+  .option('-k, --key <key>',      'Override your registered API key for this request only')
+  .action(removeBgAction);
+
+program.command('diagram <description>')
+  .description('Generate a Mermaid diagram from a plain English description using an AI model. Saves as a .mmd file by default which you can paste into mermaid.live, or use --format svg to render directly.')
+  .option('-t, --type <type>',    `Diagram type (default: flowchart). Options: ${['flowchart','sequence','class','er','gantt','pie','mindmap','timeline','gitgraph','state'].join(', ')}`)
+  .option('-f, --format <fmt>',   'Output format: mmd (default), svg, or md (Markdown with fenced code block)')
+  .option('-o, --output <path>',  'Output file path')
+  .option('-m, --model <model>',  'Text model to use for generation. Overrides defaults.text.model setting.')
+  .option('--print',              'Print the generated Mermaid syntax to the terminal')
+  .option('-k, --key <key>',      'Override your registered API key for this request only')
+  .action(diagramAction);
 
 // ── Agent ─────────────────────────────────────────────────────────────────────
 
@@ -253,8 +292,8 @@ settings.command('import <file>')
 // ── Quota ─────────────────────────────────────────────────────────────────────
 
 program.command('quota')
-  .description('Show or set your local hourly API call quota. Synced with the Pollinations Pollen hourly reset window. At 80% usage you see a warning; at 100% commands are blocked until the reset. Pass 0 to remove the limit.')
-  .argument('[limit]', 'Max API calls allowed per hour. Pass 0 to remove the limit.')
+  .description('Show or set a local hourly call cap. This is a local safeguard you set yourself — separate from your actual Pollen balance. At 80% of the cap you get a warning; at 100% commands are blocked until the hour resets. Pass 0 to remove the cap entirely.')
+  .argument('[limit]', 'Max API calls allowed per hour. Pass 0 to remove the cap.')
   .action((limit) => {
     if (limit !== undefined) {
       const n = parseInt(limit);
@@ -274,4 +313,3 @@ program.command('config')
   .action(() => console.log(JSON.stringify(config.store, null, 2)));
 
 program.parse();
-
