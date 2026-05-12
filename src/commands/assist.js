@@ -1,4 +1,3 @@
-
 import fs from 'fs-extra';
 import path from 'path';
 import yaml from 'yaml';
@@ -23,18 +22,26 @@ async function findAgentFile(startDir) {
 // FIX: mcp_servers was [] — pollinations MCP was never launched without an
 // AGENTS.md. Now it's included by default so `assist` works out of the box.
 const DEFAULT_CONFIG = {
-  roles:       { architect: 'mistral', coder: 'qwen-coder', critic: 'openai', artist: 'flux' },
+  roles: {
+    architect: 'mistral',
+    coder:     'qwen-coder',
+    critic:    'openai',
+    artist:    'flux',
+    indexer:   'mistral',
+    analyser:  'llama-scout',
+    executor:  'openai',
+  },
   researcher:  { model: 'gemini-search', enabled: true },
   constraints: [
     'Always use absolute paths for file operations',
     'Verify file existence before reading or editing',
     'Never delete the .git folder',
-    'Never hardcode API keys or secrets'
+    'Never hardcode API keys or secrets',
   ],
   context:     'General purpose development environment',
   mcp_servers: [
-    { name: 'pollinations', command: 'npx', args: ['-y', '@pollinations_ai/mcp'] }
-  ]
+    { name: 'pollinations', command: 'npx', args: ['-y', '@pollinations_ai/mcp'] },
+  ],
 };
 
 function buildDefaultAgentsMd(dir) {
@@ -45,10 +52,13 @@ Changes take effect the next time you run \`pollinations assist\`.
 
 \`\`\`yaml
 roles:
-  architect: "mistral"
-  coder:     "qwen-coder"
-  critic:    "openai"
-  artist:    "flux"
+  architect: "mistral"      # blueprints multi-file plans before coding starts
+  coder:     "qwen-coder"   # executes tasks, writes files, runs shell commands
+  critic:    "openai"       # validates every write/exec before it lands on disk
+  artist:    "flux"         # default image model for generate_image tool
+  indexer:   "mistral"      # reads project on startup, feeds structured summary to Coder
+  analyser:  "llama-scout"  # reads files/images mentioned in chat, describes them for Coder
+  executor:  "openai"       # installs deps, lints, tests, and runs/previews on task complete
 
 researcher:
   model:   "gemini-search"
@@ -74,6 +84,8 @@ mcp_servers:
   #     GITHUB_TOKEN: "\${GITHUB_TOKEN}"
 
 context: "This project is located at ${dir}"
+\`\`\`
+`;context: "This project is located at ${dir}"
 \`\`\`
 `;
 }
@@ -224,8 +236,8 @@ export async function assistAction(resumedSession = null) {
           config: {
             roles: config.roles, researcher: config.researcher,
             constraints: config.constraints, mcp_servers: config.mcp_servers,
-            context: config.context
-          }
+            context: config.context,
+          },
         };
 
         if (resumedSession) {
@@ -250,5 +262,10 @@ export async function assistAction(resumedSession = null) {
     if (!exiting) rl.prompt();
   });
 
-  rl.on('close', () => { console.log(chalk.dim('\n  Session ended.')); process.exit(0); });
+  rl.on('close', () => {
+    orchestrator.cleanup();
+    console.log(chalk.dim('\n  Session ended.'));
+    process.exit(0);
+  });
 }
+
