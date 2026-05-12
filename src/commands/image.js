@@ -31,7 +31,8 @@ export async function imageAction(prompt, options) {
         return apiClient.get(`/image/${encodeURIComponent(prompt)}?${params}`, { responseType: 'stream' });
       },
       api,
-      model
+      model,
+      { type: 'image' }
     );
 
     const writer = fs.createWriteStream(out);
