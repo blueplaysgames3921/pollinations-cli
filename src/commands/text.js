@@ -73,7 +73,8 @@ export async function textAction(prompt, options = {}) {
           messages: [{ role: 'user', content: messageContent }],
         }),
         api,
-        model
+        model,
+        { type: 'text' }
       );
       console.log(chalk.cyan(res.data.choices[0].message.content));
       quota.increment();
