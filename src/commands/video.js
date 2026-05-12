@@ -29,7 +29,8 @@ export async function videoAction(prompt, options) {
         return apiClient.get(`/video/${encodeURIComponent(prompt)}?${params}`, { responseType: 'stream' });
       },
       api,
-      model
+      model,
+      { type: 'video' }
     );
 
     const writer = fs.createWriteStream(out);
