@@ -173,11 +173,29 @@ pollinations gallery
 ```
 
 ### History & Templates
+
 ```bash
 pollinations history
 pollinations replay <id>
-pollinations template save review "Analyze this {language} code: {code}"
-pollinations template run review --language javascript
+```
+
+**Templates** — reusable prompts with `{variable}` substitution:
+
+```bash
+# Save with variables
+pollinations template save review "Review this {lang} code: {code}"
+pollinations template save commit "Write a commit message for: {diff}" -d "Git commit helper"
+
+# List all saved templates
+pollinations template list
+
+# Run — missing variables are prompted interactively, or pass as flags
+pollinations template run review
+pollinations template run review --lang javascript --code "$(cat app.js)"
+
+# Inspect or remove
+pollinations template show review
+pollinations template delete review
 ```
 
 ---
@@ -283,11 +301,16 @@ Every API call is wrapped with:
 ## Sessions
 
 ```bash
-pollinations session          # list saved sessions
+pollinations session          # list all sessions (newest first, tabular)
 pollinations continue 3       # resume session #3
 ```
 
-Saves full conversation history. Resuming restores complete context.
+When you type `exit` inside `chat` or `assist`, you're asked whether to save. On save:
+
+1. **Context dump** — the model summarises what happened: goal, files changed, decisions made, current state. Stored with the session.
+2. **Auto-title** — named from the first message + working directory + environment (e.g. "Discord bot rate limiter"). Set once, never changed.
+
+`pollinations session` shows a clean table with ID, type, title, directory/model, save time, and the first line of the context dump. When you resume with `pollinations continue`, the full context dump is shown first so you know exactly where you left off.
 
 ---
 
