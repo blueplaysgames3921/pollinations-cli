@@ -1,7 +1,7 @@
 import readline from 'readline';
 import chalk from 'chalk';
 import { getApi } from '../lib/api.js';
-import { saveSession, updateSession, makeTitle } from '../lib/sessions.js';
+import { saveSession, updateSession, makeTitle, generateTitle, generateContextDump } from '../lib/sessions.js';
 
 function displayPreviousMessages(messages, limit = 10) {
   const visible = messages.filter(m => m.role !== 'system');
@@ -84,16 +84,29 @@ export async function chatAction(options, resumedSession = null) {
 
       if (wantsSave) {
         try {
-          const firstUser = messages.find(m => m.role === 'user')?.content || '';
-          const title     = resumedSession?.title || makeTitle(firstUser);
-          const payload   = { type: 'chat', model, systemPrompt, messages, title };
+          process.stdout.write(chalk.dim('  Summarising session...'));
+
+          // Generate AI title from first message + environment (immutable after first save)
+          const title = resumedSession?.title
+            || await generateTitle(messages, null, 'chat');
+
+          // AI context dump — what happened, decisions, state
+          const contextDump = await generateContextDump(messages, 'chat');
+
+          process.stdout.write(chalk.green(' done\n'));
+
+          const payload = {
+            type: 'chat', model, systemPrompt, messages,
+            title,
+            contextDump: contextDump || undefined,
+          };
 
           if (resumedSession) {
             await updateSession(resumedSession.id, payload);
-            console.log(chalk.green(`  ✔ Session #${resumedSession.id} updated.`));
+            console.log(chalk.green(`  ✔ Session #${resumedSession.id} updated — "${title}"`));
           } else {
             const id = await saveSession(payload);
-            console.log(chalk.green(`  ✔ Session saved as #${id}.`));
+            console.log(chalk.green(`  ✔ Session saved as #${id} — "${title}"`));
           }
         } catch (err) {
           console.log(chalk.red(`  ✖ Failed to save session: ${err.message}`));
