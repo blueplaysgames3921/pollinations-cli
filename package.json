@@ -11,6 +11,25 @@
   "bin": {
     "pollinations": "./bin/pollinations.js"
   },
+    "keywords": [
+    "pollinations",
+    "pollina",
+    "cli",
+    "ai-agent",
+    "autonomous-agent",
+    "swarm-intelligence",
+    "mcp",
+    "model-context-protocol",
+    "text-to-image",
+    "text-to-video",
+    "text-to-speech",
+    "transcribe",
+    "whisper",
+    "mermaid-diagrams",
+    "remove-background",
+    "qr-code",
+    "chatbot"
+  ],
   "scripts": {
     "prepare": "node -e \"require('fs').chmodSync('./bin/pollinations.js', '755')\""
   },
