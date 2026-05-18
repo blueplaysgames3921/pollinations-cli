@@ -401,7 +401,9 @@ Output as terse bullet points under those headings. Nothing else. No padding. No
 
     this.latestResearchContext = null;
     let iteration       = 0;
-    let architectCalled = false; // prevent double-trigger
+    let architectCalled = false;
+    let executorRetries = 0;
+    const MAX_EXECUTOR_RETRIES = 3; // prevent double-trigger
 
     // ── Auto-trigger Architect for complex tasks (once per run) ─────────
     if (this._isComplexTask(userInput) && !architectCalled) {
@@ -464,12 +466,16 @@ Output as terse bullet points under those headings. Nothing else. No padding. No
           const result = await this.executor.run();
 
           if (!result.ok) {
-            // Feed failure back to Coder — don't burn an iteration on this
+            executorRetries++;
+            if (executorRetries >= MAX_EXECUTOR_RETRIES) {
+              console.log(chalk.red(`\n  ✖ Executor failed ${MAX_EXECUTOR_RETRIES} times — stopping. Fix the build environment and try again.`));
+              break;
+            }
             this.history.push({
               role:    'system',
-              content: `[EXECUTOR] Run/build failed: ${result.reason}. Please fix the issues and try again. Do not signal completion again until the build passes.`,
+              content: `[EXECUTOR] Run/build failed (attempt ${executorRetries}/${MAX_EXECUTOR_RETRIES}): ${result.reason}. Please fix the issues and try again. Do not signal completion again until the build passes.`,
             });
-            iteration--; // refund this iteration — Executor retries shouldn't eat Coder budget
+            iteration--;
             continue;
           }
 
@@ -625,44 +631,97 @@ CONSTRAINTS [ENFORCE ON EVERY ACTION — NON-NEGOTIABLE]:
 ${constraints || '  ► none specified'}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CONVERSATIONAL RULE — READ FIRST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+If the user is ONLY greeting, chatting, or asking a general question:
+  → Respond in plain text. Use ZERO tools. Do NOT list files. Do NOT read files.
+  → You already know you are in a development environment. You do NOT need to survey it.
+
+Examples of conversational input (no tools ever):
+  "hi" / "hey" / "sup" / "what can you do" / "how are you" / "thanks"
+
+Examples of task input (tools appropriate):
+  "create a landing page" / "fix the bug in auth.js" / "add a dark mode toggle"
+
+The difference: tasks have a clear deliverable. Greetings do not.
+If there is any doubt — just respond in text. Never run tools on a hunch.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 COMPLETION SIGNAL
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 When all tasks are complete, respond with a plain text summary that includes the phrase "task is complete" or "implementation is complete". Do NOT call any tool. The system will offer to run, preview, and lint the project automatically.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CONVERSATIONAL RULE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-If the user is ONLY greeting or chatting: respond in plain text. Use ZERO tools.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TOOL CALL FORMAT — STRICT AND EXACT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Output EXACTLY ONE raw JSON object per response. No markdown fences.
+Output EXACTLY ONE raw JSON object per response. No markdown fences. No wrapper text around it.
 
 CORRECT:
 {"tool": "write_file", "args": {"filePath": "src/app.js", "content": "..."}}
 
-Wait for SUCCESS or error before the next action.
+WRONG (code fence):
+\`\`\`json
+{"tool": "write_file", "args": {...}}
+\`\`\`
+
+WRONG (shorthand):
+[write_file(src/app.js)]
+
+WRONG (two objects — only first is read):
+{"tool": "list_files", "args": {}} {"tool": "write_file", "args": {...}}
+
+Wait for the system to report SUCCESS or the error before taking the next action.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FILE EDITING STRATEGY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Small changes → read_file then edit_file.
-New files / full rewrites → test_syntax then write_file (COMPLETE content, never truncated).
+For SMALL CHANGES (fix a bug, add a function, change a line):
+  1. read_file — see current content and line numbers
+  2. edit_file — use the right operation:
+       insert_after / insert_before  — add lines at a position
+       delete_lines                  — remove lines from:to
+       replace_lines                 — replace lines from:to with new content
+       replace_text                  — find exact text anywhere and replace all occurrences
+
+For NEW FILES or COMPLETE REWRITES:
+  1. test_syntax first (for .js or .json)
+  2. write_file with COMPLETE final content — never truncate, never write "// rest of code here"
+  3. Truncated content = automatic Critic FAIL
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 QUALITY PROTOCOL
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. Multi-file tasks → consult_architect FIRST
-2. Uncertain about API/version → consult_researcher
-3. Writing .js/.json → test_syntax BEFORE write_file
-4. Before edit_file → read_file
-5. Path safety: all paths resolve from ${cwd}. No "../" to escape
+1. Multi-file tasks → consult_architect FIRST, then follow the blueprint
+2. Uncertain about API, version, or library → consult_researcher. Never guess syntax
+3. Writing .js or .json → test_syntax BEFORE write_file
+4. Before edit_file → read_file to see actual current lines
+5. After writing a file → verify with list_files or read_file
+6. After MCP image generation → capture_asset IMMEDIATELY (those URLs expire)
+7. Path safety: all paths resolve from ${cwd}. No "../" to escape
+8. SUCCESS confirmed only when system reports SUCCESS — never assume
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HANDLING FAILURES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After a Critic FAIL:
+  • Read the specific reason. Fix ONLY what was flagged.
+  • Use edit_file for targeted fixes. write_file only if the whole file must change.
+  • Do not retry the same content unchanged — it will fail again.
+
+After a tool ERROR:
+  • Path errors → list_files first to verify the path exists
+  • Syntax errors → test_syntax before retrying write_file
+  • Missing packages → shell_exec npm install
+
+After max iterations:
+  • Summarise what was completed and what still needs doing
+  • The user can send a follow-up to continue
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 AVAILABLE TOOLS
@@ -675,4 +734,3 @@ ${JSON.stringify(allTools, null, 2)}`;
     this.executor.cleanup();
   }
 }
-
