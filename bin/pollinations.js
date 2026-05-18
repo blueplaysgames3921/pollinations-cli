@@ -21,7 +21,7 @@ import { galleryAction }                                 from '../src/utils/hist
 import { chatAction }                                    from '../src/commands/chat.js';
 import { authAction }                                    from '../src/commands/auth.js';
 import { historyAction, replayAction }                   from '../src/commands/history.js';
-import { templateSave, templateRun }                     from '../src/commands/template.js';
+import { templateSave, templateRun, templateList, templateDelete, templateShow } from '../src/commands/template.js';
 import { sessionAction, continueAction }                 from '../src/commands/sessions.js';
 import {
   settingsListAction, settingsGetAction, settingsSetAction,
@@ -192,16 +192,31 @@ program.command('continue <id>')
 // ── Templates ─────────────────────────────────────────────────────────────────
 
 const template = program.command('template')
-  .description('Save and run reusable prompt templates with variable substitution using {{placeholder}} syntax.');
+  .description('Save and run reusable prompt templates with {variable} substitution. Variables are filled interactively if not passed as flags.');
+
+template.command('list')
+  .description('List all saved templates with their variables, description, and a content preview.')
+  .action(templateList);
 
 template.command('save <name> <content>')
-  .description('Save a prompt template under a name. Use {{topic}} or other placeholders for variables you can fill in at runtime.')
+  .description('Save a prompt template. Use {variable} placeholders for dynamic values (e.g. "Review this {lang} code: {code}"). Prompts for confirmation before overwriting.')
+  .option('-d, --description <text>', 'Optional description shown in the template list')
+  .option('-f, --force',              'Overwrite existing template without confirmation')
   .action(templateSave);
 
 template.command('run <name>')
-  .description('Run a saved template by name. Pass --topic or other variable flags to fill in placeholders defined in the template.')
-  .option('--topic <value>', 'Value to substitute for {{topic}} in the template')
+  .description('Run a saved template. Missing variables are prompted interactively. Pass variables as flags (e.g. --lang javascript --code "...") to skip prompts.')
+  .option('-m, --model <model>',  'Model to use for this run. Overrides defaults.text.model setting.')
+  .option('-s, --stream',         'Stream the response token-by-token.')
   .action(templateRun);
+
+template.command('show <name>')
+  .description('Show the full content of a saved template and its variables.')
+  .action(templateShow);
+
+template.command('delete <name>')
+  .description('Delete a saved template. Prompts for confirmation.')
+  .action(templateDelete);
 
 // ── Account ───────────────────────────────────────────────────────────────────
 
