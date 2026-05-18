@@ -8,67 +8,146 @@ All notable changes to the Pollinations CLI will be documented in this file.
 
 #### New CLI Commands
 
-- **`pollinations transcribe <file>`** — Speech-to-text from any local audio file (mp3, mp4, wav, webm, ogg, flac, m4a). Defaults to `whisper`. Validates the chosen model against the known STT list (`whisper`, `universal-2`, `scribe`, `universal-3-pro`) and prompts to switch, proceed, or cancel if unrecognised. Error-based detection catches wrong model types post-request. Supports `--language`, `--output`, `--key`.
+- **`pollinations transcribe <file>`** — Speech-to-text from any local audio file (mp3, mp4, wav, webm, ogg, flac, m4a). Defaults to `whisper`. Validates model against known STT list and prompts to switch, proceed, or cancel if unrecognised. Supports `--language`, `--output`, `--key`.
 
-- **`pollinations upload <file>`** — Upload local files to `media.pollinations.ai`. Content-addressed, 14-day TTL, resets on re-upload. Validates file existence and extension before the spinner starts. `--copy` sends the returned URL to clipboard. URL pipes directly into `--image` on text, image, and video commands.
+- **`pollinations upload <file>`** — Upload local files to `media.pollinations.ai`. Content-addressed, 14-day TTL. Validates before spinner starts. `--copy` sends URL to clipboard. URL pipes into `--image` on other commands.
 
-- **`pollinations search <query>`** — Web search via search-capable AI models. Defaults to `gemini-search`. Warns if chosen model lacks `hasSearch`. `--raw` for minimal output.
+- **`pollinations search <query>`** — Web search via `gemini-search` by default. `--raw` for minimal output. Only models with verified `hasSearch: true` are listed.
 
-- **`pollinations qr <text>`** — QR code generation. Fully local via `qrcode` npm package — zero API calls, zero Pollen cost. Outputs PNG (default), SVG, or TXT. `--print` shows ASCII art in terminal. Configurable size, margin, colours, error correction level.
+- **`pollinations qr <text>`** — Local QR code generation via `qrcode` npm package. Zero API calls, zero Pollen. PNG/SVG/TXT output. `--print` shows ASCII in terminal.
 
-- **`pollinations remove-bg <file>`** — Background removal. Uploads source image first, then sends through `p-image-edit`. Output is a transparent PNG.
+- **`pollinations remove-bg <file>`** — Uploads image then processes through `p-image-edit`. Outputs transparent PNG.
 
-- **`pollinations diagram <description>`** — Mermaid diagram generation via AI. 10 diagram types. Saves as `.mmd`, `.md`, or `.svg` (via mermaid-cli, falls back gracefully with install hint). `--print` outputs syntax to terminal.
+- **`pollinations diagram <description>`** — AI-generated Mermaid diagrams. 10 types. Saves as `.mmd`, `.md`, or `.svg`. Path-safe extension replacement.
 
-- **`pollinations keys list|create|revoke`** — Full API key management. Requires `account:keys` on a secret key. `create` runs an interactive wizard or skips it if all flags are passed. Full key value shown once on creation. `revoke` handles 400 (self-revoke), 404 (not found), 403 (no permission).
+- **`pollinations keys list|create|revoke`** — Full API key management requiring `account:keys` permission. Interactive wizard or non-interactive flags. Key shown once on creation. Revoke handles 400/404/403 specifically. Expiry calculated from `expiresAt` directly, not the unreliable `expiresIn`.
 
-- **`pollinations usage`** — Per-request usage log with model, type, billing source (tier/crypto/pack colour-coded), cost in USD, response time. Requires `account:usage`.
+- **`pollinations usage`** — Per-request log with model, type, billing source, cost, response time. Requires `account:usage`.
 
-- **`pollinations usage-daily`** — Daily bar chart of spend and request counts. Bar colour shifts green→yellow→red. `--breakdown` adds top-15 model cost table.
+- **`pollinations usage-daily`** — Daily spend bar chart. `--breakdown` adds top-15 model cost table.
 
-- **`pollinations settings list|get|set|reset|wizard|export|import`** — Full CLI settings system persisted in `~/.pollinations/`. Covers default models, output dimensions, audio voice/format, upload behaviour, confirmation toggles, display preferences, stream mode, agent role models.
+- **`pollinations settings list|get|set|reset|wizard|export|import`** — Full settings system persisted in `~/.pollinations/`. Covers all defaults, agent role models, upload behaviour, display preferences.
 
-- **`pollinations quota [limit]`** — Local hourly call cap, separate from Pollen balance. Warns at 80%, blocks at 100%, shows exact reset time. Pass `0` to remove cap.
+- **`pollinations quota [limit]`** — Local hourly call cap, independent of Pollen balance.
+
+- **`pollinations template list|save|run|show|delete`** — Rewritten template system with `{variable}` substitution (not `{{}}`). Missing variables prompted interactively. `list` shows table with variables/description/preview. `show` prints full content. `delete` confirms before removing. Path traversal protection on template names. Reserved CLI flag names (`model`, `stream`, `key`) warned on save and excluded from flag-based resolution. Stale empty `vars` array falls back to live extraction from content.
 
 #### New Agent Capabilities
 
-- **Indexer agent** (`src/lib/agent/indexer.js`) — Runs on `pollinations assist` startup. Walks project tree (6 levels deep, ignores `node_modules`, `.git`, `dist`, etc.), reads manifests (`package.json`, `pyproject.toml`, `Cargo.toml`, `Dockerfile`, etc.) and entry point files, calls the indexer model (default `mistral`) for a structured technical summary. Summary is injected into Coder's system prompt every turn. Uses `chokidar` for file-change watching with diff-aware partial re-index: only changed files are re-read and the existing summary is patched, not rebuilt from scratch. `_partialReindex` bails if a full index is already running to prevent race conditions.
+- **Indexer agent** (`src/lib/agent/indexer.js`) — Runs on startup, reads manifests and entry points, produces structured project summary injected into Coder's system prompt. Uses `chokidar` for file-change watching. Diff-aware partial re-index: only changed files re-read, existing summary patched. Bails if a full index is already running to prevent race conditions.
 
-- **Analyser agent** (`src/lib/agent/analyser.js`) — Intercepts every user message and detects file paths (quoted, relative `./`, and absolute). Images sent as base64 vision messages (downscaled to 512px first; retries at full resolution if model responds `NEEDS_FULL_RESOLUTION`). Code/config/text files structurally summarised. Uses `llama-scout` by default. Vision fallback to `openai-fast` on 400/422 is call-local — never mutates instance state. All files processed in parallel via `Promise.allSettled` (one failure doesn't abort the rest). Greeting messages skip the analyser entirely. Analyser output pushed after the user message in history, not before.
+- **Analyser agent** (`src/lib/agent/analyser.js`) — Intercepts file paths in user messages. Processes files in parallel via `Promise.allSettled` (one failure doesn't abort the rest). Images downscaled to 512px first; retries at full resolution if model responds `NEEDS_FULL_RESOLUTION`. Vision fallback to `openai-fast` on 400/422 is call-local — never mutates instance state. Single summary line emitted after all files settle (avoids stdout interleaving). `match[1]` used exclusively in path extraction (avoids leading comma in match[0]).
 
-- **Executor agent** (`src/lib/agent/executor.js`) — Triggered when Coder signals task completion (natural language detection) and user confirms. Detects project type from filesystem (16 types: web-framework, web-vite, web-frontend, web-server, node-generic, bot-discord, bot-telegram, bot-slack, electron, react-native, android, ios, python-generic, web-server-py, go-generic, rust-generic, docker). Installs all dependencies for the detected stack (npm/yarn/pnpm/pip/go/cargo, auto-detects lockfile). Lints (eslint/pylint/clippy/go vet). Runs tests if detected. Runs/previews: web servers find a free port, start in background, wait for port to open, print a clickable terminal hyperlink. Bots watch stdout for connection confirmation. APKs run `./gradlew assembleDebug`, report APK path. Executor failures fed back to Coder for a fix pass without consuming Coder's iteration budget (`iteration--`).
+- **Executor agent** (`src/lib/agent/executor.js`) — Triggered on Coder completion signal + user confirmation. Detects 16 project types. Installs deps, lints, tests, runs/previews. Web servers: finds free port, starts in background, prints clickable terminal hyperlink. Bots: watches stdout for connection confirmation. APKs: gradle build, reports APK path.
 
-- **Auto-Architect trigger** — Tasks scoring 2+ complexity keywords or 25+ words automatically invoke the Architect before the Coder starts. `architectCalled` flag prevents double-trigger if Coder also manually calls `consult_architect`. `'complete'` removed from the keyword list to prevent collision with completion detection.
+- **Auto-Architect trigger** — Complex tasks (2+ keywords or 25+ words) invoke Architect before Coder. `architectCalled` flag prevents double-trigger. `'complete'` removed from keyword list to avoid collision with completion detection.
 
-- **Decisions-only context compression** — The session compressor now extracts only: files created/edited/deleted, commands run, errors resolved, key decisions, current state. Reasoning and explanation are explicitly discarded, keeping history lean without losing facts. Compression is skipped when the most recent system message is an Executor failure, preventing it from being swallowed before the Coder can act.
+- **Decisions-only context compression** — Compressor extracts only files changed, commands run, errors resolved, decisions made. Reasoning discarded. Compression skipped when last system message is an Executor failure.
 
-- **`.env` parsing** — `.env` file in the project root is read on `pollinations assist` startup. Key-value pairs (including `export VAR=val` syntax, quoted values, comments) are injected into every `shell_exec` call. Key names (not values) are printed to confirm they loaded.
+- **`.env` parsing** — Read on startup, injected into every `shell_exec`. Supports `export VAR=val` syntax. Key names (not values) logged to confirm loading.
 
-- **Post-run summary** — After each agent run, a one-line summary is printed: `Created: app.js · Edited: config.js · Deleted: old.js`. File existence is checked before the tool call so new vs. edited is correctly determined.
+- **Post-run file summary** — After each agent run: `Created: app.js · Edited: config.js · Deleted: old.js`. File existence checked before tool call (not after) so created vs edited is always correct.
 
-- **Destructive command warnings** — Shell commands matching patterns (`rm -rf`, `mkfs`, `dd if=`, `wipefs`, `shred`, etc.) prompt the user before execution. Non-destructive commands run uninterrupted.
+- **Destructive command warnings** — `rm -rf`, `mkfs`, `wipefs` etc. prompt user before execution.
+
+- **Executor retry cap** — Executor failures refund Coder iteration budget (`iteration--`) but are independently capped at 3 retries. Prevents infinite loop when build environment is broken.
+
+#### Session improvements
+
+- **AI-generated session titles** — On save, `openai-fast` names the session from the first user message + directory + type (e.g. "Discord bot rate limiter"). Title is immutable after first set — strict non-empty check prevents empty-string bypass.
+
+- **Context dump on save** — Model summarises the session in ≤8 bullet points: goal, files changed, decisions, current state. Base64 image data stripped from messages before sending to avoid megabyte payloads.
+
+- **`pollinations session` display** — Clean table, newest-first, 6 columns: ID, type, title, directory/model, save time, first line of context dump. Uses `os.homedir()` not `process.env.HOME` (cross-platform). Schema guard prevents crash on malformed sessions.json.
+
+- **Context dump shown on resume** — `pollinations continue <id>` shows the full context dump before the session starts so you know exactly where you left off.
 
 #### Infrastructure
 
-- **API resilience layer** (`src/lib/api-resilience.js`) — 3-attempt retry with exponential backoff (1s → 2s → 4s). Skips retry on 400/401/403/404/422. On 402 tries per-model fallback (built from the official model list), then global type default (`openai`/`flux`/`qwen-tts`/`whisper`/`ltx-2`). `audio` and `audio-stt` are separate type keys. One fallback attempt maximum. Every HTTP and network error translated to a human-readable message.
+- **API resilience layer** (`src/lib/api-resilience.js`) — 3-attempt retry, exponential backoff. Per-model fallback map (real model IDs only) then global type default on 402. `audio` and `audio-stt` split as separate type keys. One fallback max.
 
-- **Settings system** (`src/lib/settings.js`) — Central store with automatic type coercion on write. Covers default models for all commands, output dimensions, audio voice/format, upload behaviour, confirmation toggles, display, stream mode, agent role models (indexer, analyser, executor).
+- **Settings system** (`src/lib/settings.js`) — Central defaults with type coercion. Covers all command defaults and agent role models.
 
-- **Quota manager** (`src/lib/quota-manager.js`) — Local hourly call counter using `floor(epoch / 3600000)`. Also exports `fetchBalance()` which hits `/account/balance` and returns the three real Pollen buckets (`tierBalance`, `cryptoBalance`, `packBalance`).
+- **Quota manager** (`src/lib/quota-manager.js`) — Local call counter + `fetchBalance()` returning real three-bucket Pollen balance.
 
-- **Ghost runtime lint pass** — `test_syntax` and `write_file` both run `quickLint`: unused variables/imports (via per-name regex with proper RegExp escaping for `$` and `.` in names), unreachable code after `return`/`throw`. Results appended to tool output so Coder can self-correct.
+- **Ghost runtime lint pass** — `quickLint` runs on `write_file` and `test_syntax`. Checks unused variables/imports (RegExp-escaped names, so `$`/`.` don't throw), unreachable code. Dead `used` Set and `usageCode` loop removed.
 
-- **Export change detection** — `write_file` and `edit_file` snapshot named exports before and after. If any export is removed, the result message warns: `⚠ Export change detected: removed [foo, bar] — other files importing these will break.`
+- **Export change detection** — `write_file` and `edit_file` snapshot exports before/after. Warns if any named exports are removed.
 
-- **`shell_exec` exit code visibility** — Non-zero exit codes are always appended to output even when stdout/stderr is present, so the Coder can distinguish a passing command with output from a failing one.
+- **`shell_exec` exit code always shown on failure** — Non-zero exit codes appended even when stdout is present.
 
-- **`--image <url>`** on `text`, `image`, `video` — Accepts any public URL or `media.pollinations.ai` URL. Vision message on `text`, reference image for img2img/animate on `image`/`video`.
+- **`--image <url>`** on `text`, `image`, `video` — Vision messages, img2img, animate-from-image. Content sent as array (never JSON-stringified).
 
-- **`--upload`** on `image`, `video` — Post-generation upload hook. Controlled by `upload.auto`, `upload.confirm`, `upload.saveUrl` settings.
+- **`--upload`** on `image`, `video` — Post-generation upload hook controlled by settings.
 
-- **`--key <key>`** on all generation and account commands — Per-request API key override.
+- **`--key <key>`** on all commands — Per-request API key override.
 
-- **`chokidar`, `qrcode`, `form-data`** added to `package.json` dependencies.
+- **System prompt restored** — `buildSystemPrompt` fully restored: CONVERSATIONAL RULE with concrete examples, all WRONG tool call format examples, full FILE EDITING STRATEGY with all edit_file operations, QUALITY PROTOCOL steps 5-8, HANDLING FAILURES section for Critic FAIL / tool ERROR / max iterations.
+
+- **`chokidar`, `qrcode`, `form-data`** added to dependencies. `sharp` and `clipboardy` moved to `optionalDependencies`.
+
+### Changed
+
+- **`pollinations audio`** — `--instrumental` removed. Model choice determines TTS vs music. Defaults to `defaults.audio.model`.
+- **`pollinations image`** — Default corrected to `zimage`. Added `--image`, `--upload`.
+- **`pollinations video`** — Endpoint corrected to `/video/{prompt}`. Added `--image`, `--upload`.
+- **`pollinations text`** — Added `--image` for vision. Content sent as array not JSON string.
+- **`pollinations profile`** — Three-bucket balance from `/account/balance`. Tier bar with real grant amounts. Unknown tier warns. Reset time from `nextResetAt`.
+- **`pollinations quota`** — Clarified as local call cap, not Pollen tracker.
+- **All generation commands** — Read from settings, pass `type` to resilientCall, quota check/increment.
+- **`AGENTS.md` template** — Includes `indexer`, `analyser`, `executor` roles with descriptions.
+- **Orchestrator** — Integrates all three new agents. `cleanup()` stops watcher and kills Executor process. Greeting check before analyser (prevents orphaned system messages). User message pushed before analyser context (correct history order). Auto-Architect fires once (architectCalled flag). Compression skips on fresh Executor failure.
+
+### Fixed
+
+- Video endpoint was `/image/{prompt}` → `/video/{prompt}`
+- Image default `flux` → `zimage`
+- STT default `whisper-large-v3` (nonexistent) → `whisper`
+- Free fallback map had invented model IDs → rebuilt from official list
+- `gemini-fast` listed as search-capable → removed
+- `remove-bg.js` resilientCall ignored `m` param → fixed
+- `qr.js` / `remove-bg.js` unused imports → removed
+- `diagram.js` SVG fallback `str.replace('.svg')` → `path.extname` based
+- `profile.js` unknown tier showed silent 0/0 bar → warns
+- `settings.js` coercion applied `Number()` to string fields → fixed
+- `resetAllSettings` mutated config during iteration → collect first
+- `image.js`/`video.js` width/height strings from commander → `parseInt()`
+- `text.js` vision content `JSON.stringify`-ed → array sent directly
+- `keys.js` `fmtExpiry` used `expiresIn` (not in list response) → `expiresAt`
+- `profile.js` negative reset time → "resetting now" guard
+- `upload.js` spinner before validation → validation moved first
+- `quota-manager.js` corrupted (settings content appended) → restored
+- `transcribe.js` missing `options.key` → fixed
+- `resilientCall` infinite fallback loop on 402 → `usedFallback` flag
+- Balance bar used invented tier grants → real values
+- `quickLint` RegExp unescaped → `$`/`.` in names threw
+- `runChanges` `fs.pathExists` after write → always "edited" → moved before
+- `_loadDotEnv` ignored `export VAR=val` → strip prefix added
+- Dead `used` Set + `usageCode` loop in quickLint → removed
+- **O1** Analyser before greeting check → orphaned system messages → greeting first
+- **O2** Analyser context before user message → wrong history order → user first
+- **O3** Auto-Architect double-triggered → `architectCalled` flag
+- **O5** Executor failure burned iteration budget → `iteration--`
+- **O6** Compression swallowed Executor failure → guarded
+- **O7** `'complete'` in both keyword and completion lists → removed from keywords
+- **T5** `shell_exec` dropped exit code when output present → always appended
+- **A1** Vision fallback mutated `this.model` permanently → call-local `modelOverride`
+- **A2** Parallel analyser stdout interleaved → single summary line
+- **A3** `extractPaths` used `match[0]` with leading commas → `match[1]` only
+- **I1** `_partialReindex` raced with `index()` → bails if `_indexing`
+- **T2** Template vars collide with reserved flag names → warned + excluded
+- **T4** Template names unsanitised → path traversal → `validateName` regex guard
+- **T5** Stale empty `vars` array ignored new vars in content → `vars?.length` check
+- **S1** `generateTitle` crashed on array content (vision messages) → normalised
+- **S2** `generateContextDump` sent base64 image data → stripped before API call
+- **S3** Empty string title was falsy → allowed immutability bypass → strict check
+- **S4** Malformed sessions.json schema caused crashes → schema guard on load
+- **SC1** `fmtDir` used `process.env.HOME` → undefined on Windows → `os.homedir()`
+- **O2b** Executor infinite retry loop → `executorRetries` counter capped at 3
+- System prompt stripped to third of original → fully restored with all sections
+
+---
+
 
 ### Changed
 
@@ -324,4 +403,5 @@ All notable changes to the Pollinations CLI will be documented in this file.
 
 ### Security
 - Implemented local safe storage for API keys in the home directory.
+
 
