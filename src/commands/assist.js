@@ -5,7 +5,7 @@ import readline from 'readline';
 import chalk from 'chalk';
 import os from 'os';
 import { AgentOrchestrator } from '../lib/agent/orchestrator.js';
-import { saveSession, updateSession, makeTitle } from '../lib/sessions.js';
+import { saveSession, updateSession, makeTitle, generateTitle, generateContextDump } from '../lib/sessions.js';
 
 async function findAgentFile(startDir) {
   let current = startDir;
@@ -228,11 +228,21 @@ export async function assistAction(resumedSession = null) {
       const wantsSave = await promptSave(rl);
 
       if (wantsSave) {
-        const titleText = firstInput || orchestrator.history.find(m => m.role === 'user')?.content || '';
-        const title     = resumedSession?.title || makeTitle(titleText);
-        const payload   = {
+        process.stdout.write(chalk.dim('  Summarising session...'));
+
+        // AI title — immutable after first save
+        const title = resumedSession?.title
+          || await generateTitle(orchestrator.history, targetDir, 'assist');
+
+        // AI context dump
+        const contextDump = await generateContextDump(orchestrator.history, 'assist');
+
+        process.stdout.write(chalk.green(' done\n'));
+
+        const payload = {
           type: 'assist', title, directory: targetDir,
           history: orchestrator.history,
+          contextDump: contextDump || undefined,
           config: {
             roles: config.roles, researcher: config.researcher,
             constraints: config.constraints, mcp_servers: config.mcp_servers,
@@ -242,10 +252,10 @@ export async function assistAction(resumedSession = null) {
 
         if (resumedSession) {
           await updateSession(resumedSession.id, payload);
-          console.log(chalk.green(`  ✔ Session #${resumedSession.id} updated.`));
+          console.log(chalk.green(`  ✔ Session #${resumedSession.id} updated — "${title}"`));
         } else {
           const id = await saveSession(payload);
-          console.log(chalk.green(`  ✔ Session saved as #${id}.`));
+          console.log(chalk.green(`  ✔ Session saved as #${id} — "${title}"`));
         }
       }
 
