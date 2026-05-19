@@ -5,7 +5,7 @@ import readline from 'readline';
 import chalk from 'chalk';
 import os from 'os';
 import { AgentOrchestrator } from '../lib/agent/orchestrator.js';
-import { saveSession, updateSession, makeTitle, generateTitle, generateContextDump } from '../lib/sessions.js';
+import { saveSession, updateSession, generateTitle, generateContextDump } from '../lib/sessions.js';
 
 async function findAgentFile(startDir) {
   let current = startDir;
@@ -84,8 +84,6 @@ mcp_servers:
   #     GITHUB_TOKEN: "\${GITHUB_TOKEN}"
 
 context: "This project is located at ${dir}"
-\`\`\`
-`;context: "This project is located at ${dir}"
 \`\`\`
 `;
 }
