@@ -6,19 +6,32 @@ export async function listModels(options) {
   const api = getApi();
   try {
     const { data } = await api.get('/v1/models');
-    const table = new Table({ head: [chalk.green('ID'), chalk.green('Type'), chalk.green('Access')] });
+    const models   = data.data || [];
 
-    data.data.forEach(m => {
-      let type = 'text/image';
-      if (m.id.toLowerCase().includes('video')) type = 'video';
-      if (m.id.toLowerCase().includes('audio') || m.id.toLowerCase().includes('voice')) type = 'audio';
-      
-      if (options.type && !type.includes(options.type)) return;
-      table.push([m.id, type, 'Standard']);
+    const table = new Table({
+      head: [chalk.green('ID'), chalk.green('Name'), chalk.green('Type'), chalk.green('Access')],
+      colWidths: [28, 34, 8, 10],
+      wordWrap: false,
     });
 
-    console.log(table.toString());
+    for (const m of models) {
+      // Fix 6+7: use m.type field from API, not ID string matching
+      const type   = m.type || 'text';
+      const access = m.isPaidOnly ? chalk.yellow('paid') : chalk.green('free');
+
+      if (options.type && type !== options.type) continue;
+
+      table.push([
+        chalk.bold(m.id),
+        chalk.dim(m.name || m.id),
+        chalk.cyan(type),
+        access,
+      ]);
+    }
+
+    console.log('\n' + table.toString() + '\n');
   } catch (err) {
-    console.error(chalk.red('Could not fetch models from gen.pollinations.ai'));
+    console.error(chalk.red('  ✖ Could not fetch models from Pollinations API.'));
+    console.error(chalk.dim(`  ${err.message}`));
   }
 }
