@@ -60,7 +60,7 @@ export class AgentOrchestrator {
     this.history    = (config._resumedHistory || []).slice();
     this.maxIterations = 15;
 
-    this.researcherModel   = config.researcher?.model || config.roles?.researcher || 'gemini-search';
+    this.researcherModel   = config.researcher?.model || config.roles?.researcher || 'perplexity-fast';
     this.researcherEnabled = config.researcher?.enabled !== false;
     this.latestResearchContext = null;
 
