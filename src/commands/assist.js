@@ -61,7 +61,7 @@ roles:
   executor:  "openai"       # installs deps, lints, tests, and runs/previews on task complete
 
 researcher:
-  model:   "gemini-search"
+  model:   "perplexity-fast"
   enabled: true
 
 constraints:
