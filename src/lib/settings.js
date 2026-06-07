@@ -7,7 +7,7 @@ export const SETTINGS_DEFAULTS = {
   'defaults.text.model':        'openai',
   'defaults.image.model':       'zimage',
   'defaults.audio.model':       'elevenlabs',
-  'defaults.video.model':       'ltx-2',
+  'defaults.video.model':       'veo',
   'defaults.transcribe.model':  'whisper',
   'defaults.audio.voice':       'rachel',
 
@@ -98,6 +98,14 @@ export const SETTINGS_GROUPS = [
     label: 'Safety',
     keys: ['safety.enabled', 'safety.mode'],
   },
+  {
+    label: 'Agent Roles',
+    keys: [
+      'agent.indexer.model',
+      'agent.analyser.model',
+      'agent.executor.model',
+    ],
+  },
 ];
 
 // ── Get / Set ─────────────────────────────────────────────────────────────────
@@ -157,4 +165,3 @@ export function getAllSettings() {
 export function isCustomized(key) {
   return config.get(`settings.${key}`) !== undefined;
 }
-
