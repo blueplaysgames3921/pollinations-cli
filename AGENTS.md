@@ -11,7 +11,7 @@ roles:
   artist:    "flux"
 
 researcher:
-  model:   "gemini-search"
+  model:   "perplexity-fast"
   enabled: true
 
 constraints:
