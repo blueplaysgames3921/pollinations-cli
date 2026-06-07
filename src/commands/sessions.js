@@ -1,21 +1,11 @@
 import chalk from 'chalk';
+import { fmtDate } from '../utils/format.js';
 import os from 'os';
 import Table from 'cli-table3';
 import { listSessions, getSession } from '../lib/sessions.js';
 import { chatAction } from './chat.js';
 import { assistAction } from './assist.js';
 
-function fmtDate(iso) {
-  if (!iso) return chalk.dim('—');
-  try {
-    const d    = new Date(iso);
-    const date = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' });
-    const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    return chalk.dim(`${date} ${time}`);
-  } catch {
-    return chalk.dim(iso);
-  }
-}
 
 function fmtDir(directory) {
   if (!directory) return chalk.dim('—');
@@ -116,4 +106,3 @@ export async function continueAction(idArg) {
     process.exit(1);
   }
 }
-
