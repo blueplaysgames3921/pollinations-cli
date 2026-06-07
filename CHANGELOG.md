@@ -2,6 +2,50 @@
 
 All notable changes to the Pollinations CLI will be documented in this file.
 
+## [1.4.1] - 2026-05-12
+
+### Added
+
+- **`pollinations template list`** — table view of all saved templates with name, variables, description, and content preview.
+- **`pollinations template show <name>`** — prints the full content of a saved template and its variables.
+- **`pollinations template delete <name>`** — removes a saved template with confirmation prompt.
+- **`src/utils/format.js`** — new shared utilities module (`truncate`, `fmtDate`, `fmtCost`) used by `usage.js`, `history.js`, and `sessions.js`.
+
+### Changed
+
+- **Templates** — variable syntax corrected from `{{var}}` to `{var}`. Missing variables are now prompted interactively at run time instead of requiring all flags upfront. `template save` supports `--description` and `--force`. `template run` now uses a dedicated variable namespace to avoid colliding with reserved CLI flag names (`model`, `stream`, `key`).
+- **Sessions** — `pollinations session` display rewritten: newest-first, 6-column table (ID, type, title, directory/model, save time, context dump summary). Uses `os.homedir()` instead of `process.env.HOME` (cross-platform). Schema guard prevents crash on malformed `sessions.json`. Title immutability uses strict non-empty check so empty string can't bypass it.
+- **Session save** — on exit, model summarises the session in ≤8 bullet points (context dump) and auto-generates a title from the first message + directory + type. Both are shown in `pollinations session` and on resume. Base64 image data stripped before sending to avoid megabyte payloads. Array-type message content (vision messages) normalised to text for title generation.
+- **`pollinations continue <id>`** — shows full context dump before resuming so you know exactly where you left off.
+- **`batch.js`** — now reads default model from `defaults.image.model` setting instead of hardcoded `flux`. Checks quota before each image. Imports `getSetting` from settings system.
+- **`models.js`** — type detection now uses `m.type` field from the API response instead of substring-matching model IDs. Models like `whisper`, `scribe`, `elevenlabs`, `veo`, `ltx-2` now show the correct type.
+- **`history.js`** — image model fallback corrected from `flux` to `zimage`.
+- **`audio.js`, `video.js`, `search.js`** — added `logHistory` calls so these commands now appear in `pollinations history`.
+- **`upload.js`** — added `quota.check()` so uploads count against the local hourly cap.
+- **`settings.js` SETTINGS_GROUPS** — `agent.indexer.model`, `agent.analyser.model`, `agent.executor.model` added to the Agent Roles group so they appear in `pollinations settings list`.
+- **`assist.js`, `chat.js`** — removed dead `makeTitle` import (replaced by `generateTitle` in v1.4.0 but import was never cleaned up).
+- **`auth.js`, `mcp-manager.js`** — hardcoded version string `v1.3.1` updated to `v1.4.1`.
+- **Orchestrator system prompt** — fully restored to original instruction density. Sections stripped during v1.4.0 rewrite recovered: CONVERSATIONAL RULE with concrete greeting/task examples, all WRONG tool call format examples (code fence, shorthand, double-object), full FILE EDITING STRATEGY with all `edit_file` operations listed, QUALITY PROTOCOL steps 5–8 (verify after write, capture_asset after MCP image, SUCCESS only when confirmed), HANDLING FAILURES section for Critic FAIL / tool ERROR / max iterations.
+
+### Fixed
+
+- **`assist.js` syntax error** — `buildDefaultAgentsMd` template literal was duplicated, producing a stray string literal that Node rejected. Removed duplicate.
+- **Duplicate utility functions** — `truncate()` defined in 3 files, `fmtDate()` in 2 files, `fmtCost()` in 2 files. All consolidated into `src/utils/format.js`.
+- **`batch.js` ignored settings** — hardcoded `model: 'flux'` and no quota check.
+- **`models.js` type detection** — ID substring matching (`includes('audio')`) misclassified most audio and video models as text/image.
+- **Template path traversal** — template names were used directly in `path.join` with no validation. A name like `../../../etc/passwd` resolved outside `TEMPLATE_DIR`. `validateName()` now enforces `/^[\w-]+$/`.
+- **Template stale `vars` array** — saved `vars: []` (falsy for length) meant new vars added by editing the template content were never detected. Changed to `vars?.length` check.
+- **Template reserved var names** — vars named `model`, `stream`, or `key` silently picked up the flag value instead of being prompted. Now warned on save and always prompted interactively.
+- **`generateTitle` crash on vision messages** — first user message content could be an array. `.slice(0, 200)` on an array returns an array; template interpolation gave `[object Object]`. Normalised to text.
+- **`generateContextDump` megabyte payloads** — messages with base64 image data bloated the JSON to megabytes. Stripped to `[image omitted]` before sending.
+- **Session title empty-string bypass** — `existing.title || data.title` allowed an empty title to be overwritten. Changed to `!= null && !== ''` strict check.
+- **`sessions.json` schema crash** — valid JSON with wrong schema (e.g. plain array from an old version) caused `.push()` on undefined to throw. Added schema guard on `load()`.
+- **`fmtDir` Windows incompatibility** — `process.env.HOME` is undefined on Windows. Replaced with `os.homedir()`.
+- **Executor infinite retry loop** — `iteration--` refunded Coder budget on Executor failure but with no cap, a persistently broken environment looped forever. Added `executorRetries` counter capped at 3.
+- **All relative imports verified** — `node --check` run across all 28 JS files. All relative import paths verified to resolve to real files. All named imports verified to match actual exports.
+
+---
+
 ## [1.4.0] - 2026-05-11
 
 ### Added
