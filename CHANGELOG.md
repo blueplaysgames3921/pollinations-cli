@@ -2,6 +2,14 @@
 
 All notable changes to the Pollinations CLI will be documented in this file.
 
+## [1.4.2] - 2026-06-07
+
+### Fixed
+
+- **Critical CLI Launch Crash** — Fixed an unclosed string template literal (`const DEFAULT_SEARCH_MODEL = 'perplexity-fast;`) in `src/commands/search.js` that caused a `SyntaxError: Invalid or unexpected token` and completely blocked the CLI from executing any commands.
+
+---
+
 ## [1.4.1] - 2026-05-12
 
 ### Added
