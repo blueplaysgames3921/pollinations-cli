@@ -15,7 +15,7 @@ const SEARCH_MODELS = {
   'polly':                'Polly (alpha)',
 };
 
-const DEFAULT_SEARCH_MODEL = 'perplexity-fast;
+const DEFAULT_SEARCH_MODEL = 'perplexity-fast';
 
 export async function searchAction(query, options = {}) {
   if (!query) {
