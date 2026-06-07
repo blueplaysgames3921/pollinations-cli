@@ -31,7 +31,7 @@ import {
 import { config }                                        from '../src/lib/config-store.js';
 import { quota }                                         from '../src/lib/quota-manager.js';
 
-program.name('pollinations').version('1.4.1');
+program.name('pollinations').version('1.4.2');
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
