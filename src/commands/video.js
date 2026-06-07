@@ -4,6 +4,7 @@ import { quota } from '../lib/quota-manager.js';
 import { getSetting } from '../lib/settings.js';
 import { maybeUpload } from './upload.js';
 import fs from 'fs-extra';
+import { logHistory } from './history.js';
 import chalk from 'chalk';
 import ora from 'ora';
 
@@ -16,6 +17,8 @@ export async function videoAction(prompt, options) {
   const duration = parseInt(options.duration) || getSetting('defaults.video.duration');
   const seed     = options.seed     || Math.floor(Math.random() * 1e9);
   const out      = options.output   || `video_${Date.now()}.mp4`;
+
+  await logHistory('video', { prompt, model });
 
   const spinner = ora(`Generating video with ${chalk.bold(model)}...`).start();
   const api     = getApi(options.key);
