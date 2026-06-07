@@ -331,7 +331,7 @@ Pollina is a multi-role autonomous swarm that writes code, runs commands, genera
 | Coder | `qwen-coder` | Executes tasks, writes files, runs commands |
 | Architect | `mistral` | Blueprints multi-file plans before coding |
 | Critic | `openai` | Validates every write/exec before it lands on disk |
-| Researcher | `gemini-search` | Grounded web search for current API/library info |
+| Researcher | `perplexity-fast` | Grounded web search for current API/library info |
 | **Indexer** | `mistral` | Reads the project on startup, feeds structured context to Coder |
 | **Analyser** | `llama-scout` | Reads files/images mentioned in chat, describes them for Coder |
 | **Executor** | `openai` | Installs deps, lints, tests, and runs/previews on task complete |
