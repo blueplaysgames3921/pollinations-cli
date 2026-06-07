@@ -3,6 +3,7 @@ import { resilientCall, formatError } from '../lib/api-resilience.js';
 import { quota } from '../lib/quota-manager.js';
 import { getSetting } from '../lib/settings.js';
 import fs from 'fs-extra';
+import { logHistory } from './history.js';
 import chalk from 'chalk';
 import ora from 'ora';
 
@@ -18,6 +19,8 @@ export async function audioAction(prompt, options) {
     console.log(chalk.dim(`  No model specified — using default: ${model}`));
     console.log(chalk.dim(`  Set a permanent default: pollinations settings set defaults.audio.model <id>\n`));
   }
+
+  await logHistory('audio', { prompt, model });
 
   const spinner = ora(`Generating audio with ${chalk.bold(model)}...`).start();
   const api     = getApi(options.key);
