@@ -1,7 +1,7 @@
 import readline from 'readline';
 import chalk from 'chalk';
 import { getApi } from '../lib/api.js';
-import { saveSession, updateSession, makeTitle, generateTitle, generateContextDump } from '../lib/sessions.js';
+import { saveSession, updateSession, generateTitle, generateContextDump } from '../lib/sessions.js';
 
 function displayPreviousMessages(messages, limit = 10) {
   const visible = messages.filter(m => m.role !== 'system');
@@ -162,4 +162,5 @@ export async function chatAction(options, resumedSession = null) {
     process.exit(0);
   });
 }
+
 
