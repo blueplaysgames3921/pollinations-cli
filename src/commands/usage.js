@@ -1,109 +1,218 @@
+import { getApi } from '../lib/api.js';
+import { formatError } from '../lib/api-resilience.js';
 import chalk from 'chalk';
-import { fmtDate } from '../utils/format.js';
-import os from 'os';
+import { truncate, fmtDate, fmtCost } from '../utils/format.js';
 import Table from 'cli-table3';
-import { listSessions, getSession } from '../lib/sessions.js';
-import { chatAction } from './chat.js';
-import { assistAction } from './assist.js';
+import ora from 'ora';
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtDir(directory) {
-  if (!directory) return chalk.dim('—');
-  const home  = os.homedir();
-  const rel   = directory.startsWith(home) ? '~' + directory.slice(home.length) : directory;
-  const parts = rel.split('/');
-  return chalk.dim(parts.length > 2 ? '…/' + parts.slice(-2).join('/') : rel);
+function spendBar(cost, max, width = 20) {
+  if (max === 0) return chalk.dim('░'.repeat(width));
+  const filled = Math.round((cost / max) * width);
+  const empty  = width - filled;
+  const color  = filled > width * 0.75 ? chalk.red : filled > width * 0.4 ? chalk.yellow : chalk.green;
+  return color('█'.repeat(filled)) + chalk.dim('░'.repeat(empty));
 }
 
-export async function sessionAction() {
-  const sessions = await listSessions();
 
-  if (!sessions.length) {
-    console.log(chalk.yellow('\n  No saved sessions yet.'));
-    console.log(chalk.dim('  Sessions are saved when you type "exit" inside pollinations chat or pollinations assist.\n'));
-    return;
-  }
 
-  console.log(chalk.bold.cyan(`\n💬 SAVED SESSIONS`) + chalk.dim(`  ${sessions.length} total\n`));
-
-  const table = new Table({
-    head: [
-      chalk.gray('#'),
-      chalk.gray('Type'),
-      chalk.gray('Title'),
-      chalk.gray('Directory / Model'),
-      chalk.gray('Saved'),
-      chalk.gray('Summary'),
-    ],
-    colWidths: [4, 7, 32, 24, 18, 40],
-    wordWrap: true,
-    style: { head: [], border: [] },
-  });
-
-  for (const s of [...sessions].reverse()) { // newest first
-    const type = s.type === 'chat'
-      ? chalk.magenta('chat')
-      : chalk.green('assist');
-
-    const info = s.type === 'chat'
-      ? chalk.dim(s.model || 'openai')
-      : fmtDir(s.directory);
-
-    // Show first line of context dump if available, else nothing
-    const summary = s.contextDump
-      ? chalk.dim(s.contextDump.split('\n')[0].replace(/^[-•*]\s*/, '').slice(0, 38))
-      : chalk.dim('—');
-
-    table.push([
-      chalk.yellow(String(s.id)),
-      type,
-      chalk.bold(s.title || chalk.dim('(untitled)')),
-      info,
-      fmtDate(s.savedAt),
-      summary,
-    ]);
-  }
-
-  console.log(table.toString());
-  console.log(chalk.dim('\n  Resume with: pollinations continue <#>\n'));
+function fmtTime(str) {
+  const parts = str.split(' ');
+  return parts[1] ? parts[1].slice(0, 5) : '';
 }
 
-export async function continueAction(idArg) {
-  const id = parseInt(idArg, 10);
 
-  if (isNaN(id) || id < 1) {
-    console.log(chalk.red(`\n  ✖ Invalid session ID: "${idArg}". Must be a positive number.`));
-    console.log(chalk.dim('  Run "pollinations session" to see available sessions.\n'));
-    process.exit(1);
-  }
+// ── Usage History (per-request log) ──────────────────────────────────────────
 
-  const session = await getSession(id);
+export async function usageHistoryAction(options = {}) {
+  const spinner = ora('Fetching usage history...').start();
+  const api     = getApi(options.key);
+  const limit   = parseInt(options.limit) || 25;
+  const days    = parseInt(options.days)  || 7;
 
-  if (!session) {
-    console.log(chalk.red(`\n  ✖ Session #${id} not found.`));
-    console.log(chalk.dim('  Run "pollinations session" to see available sessions.\n'));
-    process.exit(1);
-  }
+  try {
+    const res = await api.get('/account/usage', {
+      params: { limit, days, format: 'json' }
+    });
 
-  // Show context dump on resume so user knows where they left off
-  if (session.contextDump) {
-    console.log(chalk.bold.cyan(`\n  📋 Session #${id} — ${session.title}`));
-    console.log(chalk.gray('  ─────────────────────────────────────────────'));
-    for (const line of session.contextDump.split('\n').slice(0, 8)) {
-      console.log(chalk.dim(`  ${line}`));
+    spinner.stop();
+
+    const records = res.data.usage || [];
+
+    if (records.length === 0) {
+      console.log(chalk.dim('\n  No usage records found for this period.\n'));
+      return;
     }
-    console.log(chalk.gray('  ─────────────────────────────────────────────\n'));
-  } else {
-    console.log(chalk.blue(`\n  ↩ Resuming session #${id} [${session.type}] — ${session.title}\n`));
-  }
 
-  if (session.type === 'chat') {
-    await chatAction({}, session);
-  } else if (session.type === 'assist') {
-    await assistAction(session);
-  } else {
-    console.log(chalk.red(`  ✖ Unknown session type: "${session.type}"`));
-    process.exit(1);
+    console.log(chalk.bold.cyan(`\n📋 USAGE HISTORY  `) + chalk.dim(`last ${days} days · ${records.length} requests`));
+    console.log(chalk.gray('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+
+    const table = new Table({
+      head: [
+        chalk.gray('Date'),
+        chalk.gray('Time'),
+        chalk.gray('Type'),
+        chalk.gray('Model'),
+        chalk.gray('Source'),
+        chalk.gray('Cost (USD)'),
+        chalk.gray('Resp ms'),
+      ],
+      colWidths: [12, 7, 18, 22, 8, 12, 10],
+      style: { compact: true },
+    });
+
+    for (const r of records) {
+      const sourceColor = r.meter_source === 'tier' ? chalk.cyan : chalk.magenta;
+      table.push([
+        fmtDate(r.timestamp),
+        chalk.dim(fmtTime(r.timestamp)),
+        truncate(r.type, 17),
+        truncate(r.model, 21),
+        sourceColor(r.meter_source || '—'),
+        chalk.yellow(fmtCost(r.cost_usd || 0)),
+        r.response_time_ms != null ? chalk.dim(r.response_time_ms) : chalk.dim('—'),
+      ]);
+    }
+
+    console.log(table.toString());
+
+    // Summary line
+    const totalCost = records.reduce((s, r) => s + (r.cost_usd || 0), 0);
+    const avgResp   = records
+      .filter(r => r.response_time_ms != null)
+      .reduce((s, r, _, a) => s + r.response_time_ms / a.length, 0);
+
+    console.log(
+      chalk.dim(`\n  Total: `) +
+      chalk.yellow(`$${fmtCost(totalCost)}`) +
+      chalk.dim('  ·  Avg response: ') +
+      chalk.dim(`${Math.round(avgResp)}ms`) +
+      chalk.dim(`  ·  Period: last ${days} days\n`)
+    );
+
+  } catch (err) {
+    spinner.fail(chalk.red('Failed to fetch usage history.'));
+    const status = err.response?.status;
+    if (status === 403) {
+      console.log(chalk.red('  Your API key needs the account:usage permission for this command.'));
+    } else {
+      console.log(chalk.red(`  ${formatError(err)}`));
+    }
+  }
+}
+
+// ── Daily Usage (bar chart by day) ───────────────────────────────────────────
+
+export async function usageDailyAction(options = {}) {
+  const spinner = ora('Fetching daily usage...').start();
+  const api     = getApi(options.key);
+  const days    = parseInt(options.days) || 14;
+
+  try {
+    const res = await api.get('/account/usage/daily', {
+      params: { days, format: 'json' }
+    });
+
+    spinner.stop();
+
+    const records = res.data.usage || [];
+
+    if (records.length === 0) {
+      console.log(chalk.dim('\n  No usage data found for this period.\n'));
+      return;
+    }
+
+    // Aggregate by date (collapse model rows into one per day)
+    const byDate = {};
+    for (const r of records) {
+      const d = r.date;
+      if (!byDate[d]) byDate[d] = { date: d, requests: 0, cost_usd: 0, sources: new Set() };
+      byDate[d].requests += r.requests || 0;
+      byDate[d].cost_usd += r.cost_usd || 0;
+      if (r.meter_source) byDate[d].sources.add(r.meter_source);
+    }
+
+    const days_arr = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
+    const maxCost  = Math.max(...days_arr.map(d => d.cost_usd), 0.0001);
+    const maxReqs  = Math.max(...days_arr.map(d => d.requests), 1);
+
+    console.log(chalk.bold.cyan(`\n📊 DAILY USAGE  `) + chalk.dim(`last ${days} days`));
+    console.log(chalk.gray('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+
+    // Bar chart
+    for (const d of days_arr) {
+      const bar      = spendBar(d.cost_usd, maxCost, 24);
+      const reqBar   = spendBar(d.requests, maxReqs, 10);
+      const sources  = [...d.sources].join('+') || '—';
+      const srcColor = sources.includes('pack') || sources.includes('crypto')
+        ? chalk.magenta : chalk.cyan;
+
+      console.log(
+        chalk.bold(d.date) + '  ' +
+        bar + '  ' +
+        chalk.yellow(`$${fmtCost(d.cost_usd)}`) +
+        chalk.dim('  ') +
+        reqBar + '  ' +
+        chalk.dim(`${d.requests} req`) +
+        chalk.dim('  ') +
+        srcColor(sources)
+      );
+    }
+
+    // Totals
+    const totalCost = days_arr.reduce((s, d) => s + d.cost_usd, 0);
+    const totalReqs = days_arr.reduce((s, d) => s + d.requests, 0);
+
+    console.log(chalk.gray('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+    console.log(
+      chalk.dim('  Total: ') +
+      chalk.yellow(`$${fmtCost(totalCost)}`) +
+      chalk.dim('  ·  ') +
+      chalk.bold(`${totalReqs}`) +
+      chalk.dim(' requests  ·  ') +
+      chalk.dim('█ = spend   ') +
+      chalk.dim('tier=') + chalk.cyan('■') +
+      chalk.dim('  pack/crypto=') + chalk.magenta('■') + '\n'
+    );
+
+    // Optional: model breakdown table
+    if (options.breakdown) {
+      const byModel = {};
+      for (const r of records) {
+        const m = r.model || 'unknown';
+        if (!byModel[m]) byModel[m] = { model: m, requests: 0, cost_usd: 0 };
+        byModel[m].requests += r.requests || 0;
+        byModel[m].cost_usd += r.cost_usd || 0;
+      }
+
+      const modelRows = Object.values(byModel)
+        .sort((a, b) => b.cost_usd - a.cost_usd)
+        .slice(0, 15);
+
+      console.log(chalk.bold.cyan('📦 TOP MODELS'));
+      const modelTable = new Table({
+        head: [chalk.gray('Model'), chalk.gray('Requests'), chalk.gray('Total Cost')],
+      });
+      for (const m of modelRows) {
+        modelTable.push([
+          truncate(m.model, 30),
+          m.requests,
+          chalk.yellow(`$${fmtCost(m.cost_usd)}`),
+        ]);
+      }
+      console.log(modelTable.toString());
+      console.log('');
+    }
+
+  } catch (err) {
+    spinner.fail(chalk.red('Failed to fetch daily usage.'));
+    const status = err.response?.status;
+    if (status === 403) {
+      console.log(chalk.red('  Your API key needs the account:usage permission for this command.'));
+    } else {
+      console.log(chalk.red(`  ${formatError(err)}`));
+    }
   }
 }
 
