@@ -31,7 +31,7 @@ const DEFAULT_CONFIG = {
     analyser:  'llama-scout',
     executor:  'openai',
   },
-  researcher:  { model: 'gemini-search', enabled: true },
+  researcher:  { model:'perplexity-fast', enabled: true },
   constraints: [
     'Always use absolute paths for file operations',
     'Verify file existence before reading or editing',
