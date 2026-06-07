@@ -1,6 +1,7 @@
 import { getApi } from '../lib/api.js';
 import { formatError } from '../lib/api-resilience.js';
 import { getSetting } from '../lib/settings.js';
+import { quota } from '../lib/quota-manager.js';
 import fs from 'fs-extra';
 import path from 'path';
 import chalk from 'chalk';
@@ -65,6 +66,8 @@ export async function fetchMediaMeta(hash) {
 // ── Upload command ────────────────────────────────────────────────────────────
 
 export async function uploadAction(filePath, options = {}) {
+  if (!quota.check()) return;
+
   if (!filePath) {
     console.error(chalk.red('  ✖ Provide a file path. Usage: pollinations upload <file>'));
     return;
