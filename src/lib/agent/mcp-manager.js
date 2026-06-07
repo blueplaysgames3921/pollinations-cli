@@ -20,7 +20,7 @@ export class MCPManager {
     try {
       const mergedEnv = { ...process.env, ...this._resolveEnvVars(env) };
       const transport = new StdioClientTransport({ command, args, env: mergedEnv });
-      const client = new Client({ name: 'pollina-agent', version: '1.4.1' }, { capabilities: {} });
+      const client = new Client({ name: 'pollina-agent', version: '1.4.2' }, { capabilities: {} });
       await client.connect(transport);
       this.clients.set(serverName, client);
       return true;
