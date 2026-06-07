@@ -4,6 +4,7 @@ import os from 'os';
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import { textAction } from './text.js';
+import { truncate } from '../utils/format.js';
 import { imageAction } from './image.js';
 
 const histPath = path.join(os.homedir(), '.pollinations', 'history.jsonl');
@@ -15,11 +16,6 @@ export async function logHistory(cmd, params) {
   await fs.appendFile(histPath, entry);
 }
 
-function truncate(str, len) {
-  if (!str) return chalk.dim('(empty)');
-  const s = str.replace(/\n/g, ' ').trim();
-  return s.length > len ? s.slice(0, len) + '…' : s;
-}
 
 export async function historyAction() {
   if (!(await fs.pathExists(histPath))) return console.log(chalk.yellow('No history yet.'));
@@ -69,7 +65,7 @@ export async function historyAction() {
     for (const { idx, data } of imageEntries) {
       t.push([
         chalk.yellow(String(idx)),
-        chalk.dim(data.params.options?.model || 'flux'),
+        chalk.dim(data.params.options?.model || 'zimage'),
         truncate(data.params.prompt, 55)
       ]);
     }
@@ -118,4 +114,5 @@ export async function replayAction(idArg) {
   if (data.cmd === 'text') await textAction(data.params.content, data.params);
   else                     await imageAction(data.params.prompt, data.params.options);
 }
+
 
