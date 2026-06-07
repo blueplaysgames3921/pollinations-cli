@@ -2,6 +2,7 @@ import { getApi } from '../lib/api.js';
 import { resilientCall, formatError } from '../lib/api-resilience.js';
 import { quota } from '../lib/quota-manager.js';
 import chalk from 'chalk';
+import { logHistory } from './history.js';
 import ora from 'ora';
 
 // Search-capable models — hasSearch: true per official model list
@@ -31,6 +32,8 @@ export async function searchAction(query, options = {}) {
     console.log(chalk.yellow(`  ⚠ '${model}' may not have web search capability.`));
     console.log(chalk.dim(`  Search-capable models: ${Object.keys(SEARCH_MODELS).join(', ')}\n`));
   }
+
+  await logHistory('search', { query, model });
 
   const spinner = ora(`Searching with ${chalk.bold(model)}...`).start();
   const api     = getApi(options.key);
